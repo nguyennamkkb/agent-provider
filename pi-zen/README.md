@@ -2,28 +2,31 @@
 
 Đưa model FREE của [OpenCode Zen](https://opencode.ai/zen/v1) vào [Pi coding agent](https://github.com/earendil-works/pi-coding-agent).
 
-Zen yêu cầu giả lập header `x-opencode-*` nên repo gồm 2 phần: lệnh `zen` để cấu hình provider/model, và 1 extension TypeScript để tự gắn header cho mọi request Zen.
+Zen yêu cầu giả lập header `x-opencode-*` (thiếu `x-opencode-session` là lỗi
+`MissingSessionID`). `zen add` ghi headers tĩnh thẳng vào `models.json`
+(Pi hỗ trợ `headers` ở provider) — thực nghiệm chạy được không cần gì thêm.
+Extension TypeScript chỉ còn tác dụng nâng cao: sinh `ses_` ổn định theo
+conversation Pi và `msg_` mới mỗi request (thay vì id tĩnh chung mọi request).
 
 ## Cài đặt
 
 ```bash
-./zen install
+./install.py install
 zen doctor
 ```
 
-`install` làm 2 việc:
+`install` chỉ cài lệnh `zen` vào `~/.local/bin` (đã có trong PATH).
+Extension là optional — chỉ thêm `--with-ext` khi cần id động theo conversation
+(headers tĩnh trong `models.json` đã đủ chạy).
 
-- Symlink `zen-session-headers.ts` → `~/.pi/agent/extensions/` (Pi tự load).
-- Symlink `zen` → `~/.local/bin/zen` (đã có trong PATH).
-
-Tùy chọn: `--bin-dir DIR`, `--no-bin` (chỉ link extension), `--uninstall`.
+Tùy chọn: `--bin-dir DIR`, `--no-bin`, `--with-ext`, `--uninstall`.
 
 ## Cách dùng
 
 ```bash
 zen add <provider-id> <api-key> [--default]
 zen sync [--provider <id>] [--key <key>] [--dry-run]
-zen install [--bin-dir DIR] [--no-bin] [--uninstall]
+zen install [--bin-dir DIR] [--no-bin] [--with-ext] [--uninstall]
 zen doctor
 ```
 
@@ -40,7 +43,7 @@ zen add zen-phu sk-abc...xxx --default
 zen sync --provider zen-phu --dry-run
 ```
 
-## Models free (bảng verify sẵn trong `zen`)
+## Models free (bảng verify sẵn trong `install.py`)
 
 | Model | API | Context | Max output | Reasoning | Input |
 |---|---|---|---|---|---|
@@ -57,7 +60,7 @@ Model lạ ngoài bảng: `sync` tự probe, context default 128k.
 
 ```
 pi-zen/
-  zen                       # lệnh chung duy nhất (Python 3, không cần dep ngoài stdlib)
+  install.py                # lệnh chung duy nhất (Python 3, không cần dep ngoài stdlib)
   zen-session-headers.ts    # Pi extension: gắn header + giữ session id ổn định
   README.md                 # file này
 ```

@@ -1,0 +1,36 @@
+#!/usr/bin/env python3
+"""Sinh OpenCode session/request id cho headers trong models.yml.
+
+omp resolve giá trị `!command` trong headers mỗi request nhưng cache theo
+process (xem model-config-values.ts: commandValueCache) — nên mỗi lần mở
+omp là 1 ses_ mới, các request trong cùng process dùng chung.
+
+Cách dùng: zen-session-id [ses|msg]  (mặc định ses)
+"""
+import secrets
+import struct
+import sys
+import time
+
+BASE62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
+
+def new_id(prefix: str, descending: bool) -> str:
+    t = (int(time.time() * 1000) * 0x1000 + 1) & ((1 << 64) - 1)
+    if descending:
+        t = (~t) & ((1 << 64) - 1)
+    hexpart = struct.pack(">Q", t)[2:].hex()
+    rand = "".join(secrets.choice(BASE62) for _ in range(14))
+    return prefix + hexpart + rand
+
+
+def main() -> None:
+    kind = sys.argv[1] if len(sys.argv) > 1 else "ses"
+    if kind == "msg":
+        print(new_id("msg_", False))
+    else:
+        print(new_id("ses_", True))
+
+
+if __name__ == "__main__":
+    main()

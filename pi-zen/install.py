@@ -4,7 +4,7 @@
 Cách dùng:
   zen add <provider-id> <api-key> [--default]
   zen sync [--provider <id>] [--key <key>] [--dry-run]
-  zen install [--bin-dir DIR] [--no-bin] [--uninstall]
+  zen install [--bin-dir DIR] [--no-bin] [--with-ext] [--uninstall]
   zen doctor
 """
 import argparse
@@ -96,6 +96,9 @@ def ensure_provider(models_cfg: dict, provider: str) -> dict:
     entry["baseUrl"] = ZEN_BASE
     entry["api"] = "openai-completions"  # default; model responses override riêng
     entry.setdefault("compat", {}).setdefault("supportsDeveloperRole", False)
+    # Headers tĩnh như omp (Pi hỗ trợ headers ở provider): giữ header custom
+    # của user, chỉ set/refresh nhóm x-opencode-* (Zen bắt buộc session).
+    entry["headers"] = {**(entry.get("headers") or {}), **zen_headers_static()}
     return entry
 
 
@@ -133,6 +136,18 @@ def new_id(prefix: str, descending: bool) -> str:
     hexpart = struct.pack(">Q", t)[2:].hex()
     rand = "".join(secrets.choice(BASE62) for _ in range(14))
     return prefix + hexpart + rand
+
+
+def zen_headers_static() -> dict:
+    # Headers tĩnh ghi vào models.json (không gồm Authorization — Pi tự gắn
+    # từ auth.json). Thực nghiệm (omp): Zen chỉ kiểm tra presence session.
+    return {
+        "User-Agent": "opencode/1.18.30",
+        "x-opencode-client": "cli",
+        "x-opencode-project": "global",
+        "x-opencode-session": new_id("ses_", True),
+        "x-opencode-request": new_id("msg_", False),
+    }
 
 
 def zen_headers(key: str) -> dict:
@@ -294,13 +309,17 @@ def cmd_sync(provider: str, key_arg: Optional[str], dry_run: bool, home: Path) -
     print(f"\nĐã ghi {models_path} (backup .bak)")
 
 
-def cmd_install(bin_dir: Optional[Path], uninstall: bool, home: Path) -> None:
+def cmd_install(bin_dir: Optional[Path], uninstall: bool, home: Path,
+                with_ext: bool = False) -> None:
+    # Extension là optional (headers tĩnh trong models.json đã đủ chạy).
+    # Chỉ link extension khi --with-ext (cần ses_ riêng mỗi conversation Pi
+    # và msg_ mới mỗi request thay vì id tĩnh).
     pi_dir = home / ".pi" / "agent"
     ext_dst = pi_dir / "extensions" / EXT_FILE
     ext_src = REPO_DIR / EXT_FILE
     zen_src = Path(__file__).resolve()
 
-    if not ext_src.is_file():
+    if with_ext and not ext_src.is_file():
         print(f"Thiếu file: {ext_src}", file=sys.stderr)
         sys.exit(1)
 
@@ -316,11 +335,12 @@ def cmd_install(bin_dir: Optional[Path], uninstall: bool, home: Path) -> None:
         print("Xong.")
         return
 
-    (pi_dir / "extensions").mkdir(parents=True, exist_ok=True)
-    if ext_dst.is_symlink() or ext_dst.exists():
-        ext_dst.unlink()
-    ext_dst.symlink_to(ext_src)
-    print(f"Đã link extension: {ext_dst} -> {ext_src}")
+    if with_ext:
+        (pi_dir / "extensions").mkdir(parents=True, exist_ok=True)
+        if ext_dst.is_symlink() or ext_dst.exists():
+            ext_dst.unlink()
+        ext_dst.symlink_to(ext_src)
+        print(f"Đã link extension: {ext_dst} -> {ext_src}")
 
     if bin_dir is not None:
         bin_dir.mkdir(parents=True, exist_ok=True)
@@ -357,12 +377,12 @@ def cmd_doctor(home: Path) -> int:
         target = Path(ext_dst.readlink())
         print(f"[OK] extension: {ext_dst} -> {target}")
         if target != REPO_DIR / EXT_FILE:
-            print("[WARN] extension đang trỏ sang repo khác, chạy: zen install")
+            print("[WARN] extension đang trỏ sang repo khác, chạy: zen install --with-ext")
     elif ext_dst.is_file():
-        print("[WARN] extension là file copy (không phải symlink), chạy: zen install")
+        print("[WARN] extension là file copy (không phải symlink)")
     else:
-        print("[FAIL] thiếu extension, chạy: zen install")
-        fail = 1
+        print("[INFO] chưa cài extension (optional — headers tĩnh đã đủ chạy;")
+        print("       cần id động theo conversation thì chạy: zen install --with-ext)")
 
     if which("zen"):
         print(f"[OK] zen: {which('zen')}")
@@ -377,6 +397,12 @@ def cmd_doctor(home: Path) -> int:
                          if "opencode.ai/zen" in str(v.get("baseUrl", ""))]
         if zen_providers:
             print(f"[OK] provider Zen trong models.json: {', '.join(zen_providers)}")
+            for pid in zen_providers:
+                headers = (providers[pid] or {}).get("headers", {}) or {}
+                if "x-opencode-session" in headers:
+                    print(f"[OK] headers tĩnh cho '{pid}' (đủ chạy không cần extension)")
+                else:
+                    print(f"[WARN] '{pid}' thiếu headers tĩnh, chạy lại: zen add {pid} <key>")
         else:
             print("[WARN] chưa có provider Zen nào, chạy: zen add <id> <key>")
     except Exception as e:  # noqa: BLE001
@@ -401,12 +427,14 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--key", default=None)
     s.add_argument("--dry-run", action="store_true")
 
-    i = sub.add_parser("install", help="Link extension + cài lệnh zen vào PATH")
+    i = sub.add_parser("install", help="Cài lệnh zen vào PATH (+extension nếu --with-ext)")
     i.add_argument("--bin-dir", default=str(Path.home() / ".local" / "bin"))
     i.add_argument("--no-bin", action="store_true")
     i.add_argument("--uninstall", action="store_true")
+    i.add_argument("--with-ext", action="store_true",
+                   help="link extension gắn headers động (optional, mặc định không)")
 
-    sub.add_parser("doctor", help="Kiểm tra cài đặt (pi, extension, bin, provider)")
+    sub.add_parser("doctor", help="Kiểm tra cài đặt (pi, bin, provider, headers)")
     return p
 
 
@@ -423,7 +451,8 @@ def main() -> None:
     elif args.cmd == "sync":
         cmd_sync(args.provider, args.key, args.dry_run, home)
     elif args.cmd == "install":
-        cmd_install(None if args.no_bin else Path(args.bin_dir), args.uninstall, home)
+        cmd_install(None if args.no_bin else Path(args.bin_dir), args.uninstall,
+                    home, args.with_ext)
     elif args.cmd == "doctor":
         sys.exit(cmd_doctor(home))
     else:
