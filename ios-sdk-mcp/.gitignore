@@ -1,0 +1,4 @@
+node_modules/
+dist/
+*.png
+*_images/
