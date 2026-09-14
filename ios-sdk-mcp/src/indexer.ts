@@ -356,10 +356,15 @@ export class SdkIndexer {
     const like = `%${query}%`;
     const prefix = `${query}%`;
     // Dedup across platforms: one row per (name, kind, framework), with
-    // platforms aggregated. The best (lowest introduced) row wins ranking.
+    // platforms aggregated. Aggregates are deterministic: MIN introduced,
+    // MAX deprecated/obsoleted (platform nao deprecated thi hien), MAX cho
+    // text fields (SQLite bare-column lay row dau tien tuy y -> sai).
     let sql = `
-      SELECT name, kind, framework, parent_type, signature, availability,
-             introduced_in, deprecated_in, renamed_to, lang,
+      SELECT name, kind, framework,
+             MAX(parent_type) as parent_type, MAX(signature) as signature,
+             MAX(availability) as availability,
+             MIN(introduced_in) as introduced_in, MAX(deprecated_in) as deprecated_in,
+             MAX(renamed_to) as renamed_to, MAX(lang) as lang,
              GROUP_CONCAT(DISTINCT platform) as platforms
       FROM symbols
       WHERE (name LIKE ? OR signature LIKE ? OR parent_type LIKE ?)`;
@@ -382,7 +387,11 @@ export class SdkIndexer {
       params.push(iosVersion);
     }
 
-    sql += ` GROUP BY name, kind, framework
+    // Dedup key gom ca parent_type + signature: cung ten 'init'/'+' nhung khac
+    // cha/khac signature la API khac nhau (neu chi group name+kind+framework,
+    // Text+ se bi row '+' cua CGSize nuot mat - realdb sweep da bat). Overloads
+    // khac signature giu rieng tung row; trung lap cross-platform moi bi gop.
+    sql += ` GROUP BY name, kind, framework, parent_type, signature
               ORDER BY CASE WHEN name = ? THEN 0 WHEN name LIKE ? THEN 1 ELSE 2 END,
               introduced_in DESC, name LIMIT ?`;
     params.push(query, prefix, Math.min(limit, 200));
@@ -522,8 +531,10 @@ export class SdkIndexer {
     const dedup = platform
       ? `name, kind, framework, lang, parent_type, signature, availability,
              introduced_in, deprecated_in, platform as platforms`
-      : `name, kind, framework, lang, parent_type, signature, availability,
-             introduced_in, deprecated_in, GROUP_CONCAT(DISTINCT platform) as platforms`;
+      : `name, kind, framework, MAX(lang) as lang, parent_type,
+             signature, MAX(availability) as availability,
+             MIN(introduced_in) as introduced_in, MAX(deprecated_in) as deprecated_in,
+             GROUP_CONCAT(DISTINCT platform) as platforms`;
     let sql = `
       SELECT ${dedup}
       FROM symbols
@@ -538,7 +549,10 @@ export class SdkIndexer {
       sql += ` AND platform = ?`;
       params.push(platform);
     } else {
-      sql += ` GROUP BY name, kind, signature`;
+      // group ca framework/parent_type: init cua Text khac init cua GridItem,
+      // func cua SwiftUICore khac func cua UIKit. parent_type/signature la
+      // group keys (cung grain voi name/kind/framework).
+      sql += ` GROUP BY name, kind, framework, parent_type, signature`;
     }
     sql += ` ORDER BY kind, name LIMIT ?`;
     params.push(Math.min(limit, 500));
@@ -560,8 +574,11 @@ export class SdkIndexer {
 
   getNewApis(iosVersion: number, framework?: string, platform?: string): SearchResult[] {
     let sql = `
-      SELECT name, kind, framework, parent_type, signature, availability,
-             introduced_in, deprecated_in, renamed_to, lang,
+      SELECT name, kind, framework,
+             MAX(parent_type) as parent_type, MAX(signature) as signature,
+             MAX(availability) as availability,
+             MIN(introduced_in) as introduced_in, MAX(deprecated_in) as deprecated_in,
+             MAX(renamed_to) as renamed_to, MAX(lang) as lang,
              GROUP_CONCAT(DISTINCT platform) as platforms
       FROM symbols WHERE introduced_in = ?`;
     const params: (string | number)[] = [iosVersion];
@@ -573,18 +590,26 @@ export class SdkIndexer {
       sql += ` AND platform = ?`;
       params.push(platform);
     }
-    sql += ` GROUP BY name, kind, framework ORDER BY framework, name LIMIT 200`;
+    sql += ` GROUP BY name, kind, framework, parent_type, signature ORDER BY framework, name LIMIT 200`;
     const results = this.db.exec(sql, params);
     if (results.length === 0) return [];
     return results[0].values.map(rowToSearch);
   }
 
-  /** Deprecated / obsoleted / unavailable APIs — with renamed_to for migration. */
+  /** Deprecated / obsoleted / unavailable APIs — with renamed_to for migration.
+   * Dedup lay MAX(deprecated_in/obsoleted_in): cung 1 API, platform nao deprecated
+   * thi hien. Dedup key gom parent_type+signature (giong search) de 'init'/'+'
+   * cua type khac khong nuot lan nhau. */
   getDeprecated(iosVersion: number, framework?: string, platform?: string): DeprecatedApi[] {
     let sql = `
       SELECT name, kind, framework, parent_type, signature, availability,
              introduced_in, deprecated_in, renamed_to, lang, platforms, unavailable, obsoleted_in
-      FROM (SELECT *, GROUP_CONCAT(DISTINCT platform) as platforms FROM symbols GROUP BY name, kind, framework) s
+      FROM (SELECT name, kind, framework, parent_type, signature,
+              MAX(availability) as availability, MIN(introduced_in) as introduced_in,
+              MAX(deprecated_in) as deprecated_in, MAX(renamed_to) as renamed_to,
+              MAX(lang) as lang, GROUP_CONCAT(DISTINCT platform) as platforms,
+              MAX(unavailable) as unavailable, MAX(obsoleted_in) as obsoleted_in
+            FROM symbols GROUP BY name, kind, framework, parent_type, signature) s
       WHERE ((deprecated_in IS NOT NULL AND deprecated_in <= ?)
          OR (obsoleted_in IS NOT NULL AND obsoleted_in <= ?)
          OR unavailable = 1)`;
@@ -597,7 +622,11 @@ export class SdkIndexer {
       sql += ` AND platforms LIKE ?`;
       params.push(`%${platform}%`);
     }
-    sql += ` ORDER BY framework, name LIMIT 200`;
+    // Sort: co deprecated/obsoleted version that len truoc (AI migrate duoc ngay),
+    // unavailable-only xuong sau (thuong la API cua platform khac). Trong tung
+    // nhom xep theo deprecated_in desc (moi deprecated nhat truoc) roi den name.
+    sql += ` ORDER BY CASE WHEN deprecated_in IS NOT NULL OR obsoleted_in IS NOT NULL THEN 0 ELSE 1 END,
+              COALESCE(deprecated_in, obsoleted_in, 0) DESC, framework, name LIMIT 200`;
     const results = this.db.exec(sql, params);
     if (results.length === 0) return [];
     return results[0].values.map((r) => ({
