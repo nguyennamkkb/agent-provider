@@ -282,6 +282,35 @@ describe('objc: enums + versions', () => {
     const b = objc(`typedef NS_ENUM(NSInteger, E) {\nEA = 0,\n} API_UNAVAILABLE(tvos);`);
     expect(b.find((x) => x.kind === 'enum')!.unavailable).toBe(false);
   });
+  it('standalone macro line applies to next decl (ARSession old style)', () => {
+    const s = objc(`API_AVAILABLE(ios(11.0))\n@interface ARSession : NSObject\n- (void)pause;\n@end`);
+    expect(s.find((x) => x.name === 'ARSession')).toMatchObject({ kind: 'class', introducedIn: 110000 });
+    // members without own macro stay UNKNOWN (no leakage from the class line)
+    expect(s.find((x) => x.name === 'pause')).toMatchObject({ introducedIn: 999999 });
+  });
+  it('standalone macro before typedef enum + members', () => {
+    const s = objc(`API_AVAILABLE(ios(11.0))\ntypedef NS_OPTIONS(NSUInteger, Opts) {\nOptsA = (1 << 0),\n};`);
+    expect(s.find((x) => x.name === 'Opts')).toMatchObject({ kind: 'enum', introducedIn: 110000 });
+    // members inherit enum availability
+    expect(s.find((x) => x.name === 'OptsA')).toMatchObject({ kind: 'case', introducedIn: 110000 });
+  });
+  it('enum member inline macro overrides inherited', () => {
+    const s = objc(`API_AVAILABLE(ios(11.0))\ntypedef NS_OPTIONS(NSUInteger, Opts) {\nOptsA = 0,\nOptsB API_AVAILABLE(ios(14.0)),\n};`);
+    expect(s.find((x) => x.name === 'OptsA')).toMatchObject({ introducedIn: 110000 });
+    expect(s.find((x) => x.name === 'OptsB')).toMatchObject({ introducedIn: 110000 });
+  });
+  it('standalone consumed by @interface, not leaked to members', () => {
+    // standalone line belongs to the NEXT decl only: @interface A takes it,
+    // identifier keeps its own inline ios(13.0).
+    const s = objc(`API_AVAILABLE(ios(11.0))\n@interface A\n@property (atomic, strong, readonly) NSUUID *identifier API_AVAILABLE(ios(13.0));\n@end`);
+    expect(s.find((x) => x.name === 'A')).toMatchObject({ introducedIn: 110000 });
+    expect(s.find((x) => x.name === 'identifier')).toMatchObject({ introducedIn: 130000 });
+  });
+  it('standalone does not leak past blank line into unrelated decl', () => {
+    const s = objc(`API_AVAILABLE(ios(11.0))\n@interface A : NSObject\n@end\n@interface B : NSObject\n@end`);
+    expect(s.find((x) => x.name === 'A')).toMatchObject({ introducedIn: 110000 });
+    expect(s.find((x) => x.name === 'B')).toMatchObject({ introducedIn: 999999 });
+  });
   it('NS_AVAILABLE_IOS underscore', () => {
     const s = objc(`- (void)go NS_AVAILABLE_IOS(13_0);`);
     expect(s[0]).toMatchObject({ introducedIn: 130000 });

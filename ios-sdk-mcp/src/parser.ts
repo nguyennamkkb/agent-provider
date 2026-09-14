@@ -745,6 +745,28 @@ function extractObjCAvailability(line: string): {
   return { clean, avail, rawMacros: raws };
 }
 
+/**
+ * Merge standalone-line availability (pending) with inline suffixes.
+ * Inline wins for introduced (more specific); deprecation/obsoleted/renamed/
+ * unavailable union. Either side may be null/empty.
+ */
+export function mergeObjCAvail(
+  pending: AvailabilityInfo | null,
+  inline: AvailabilityInfo,
+): AvailabilityInfo {
+  if (!pending || !pending.raw) return inline;
+  if (!inline.raw) return pending;
+  return {
+    raw: `${pending.raw} ${inline.raw}`,
+    introducedIn: Math.min(pending.introducedIn, inline.introducedIn),
+    deprecatedIn: pending.deprecatedIn ?? inline.deprecatedIn,
+    obsoletedIn: pending.obsoletedIn ?? inline.obsoletedIn,
+    renamedTo: pending.renamedTo ?? inline.renamedTo,
+    unavailable: pending.unavailable || inline.unavailable,
+    deprecated: pending.deprecated || inline.deprecated,
+  };
+}
+
 /** First selector chunk list: "a:(..)x b:(..)y;" -> "a:b:". Nullary -> method name.
  * Stops at trailing macros (NS_SWIFT_NAME(...) etc.) so they don't leak into
  * the selector. */
@@ -768,6 +790,8 @@ export function parseObjCHeader(
   let inEnum: { name: string; avail: AvailabilityInfo } | null = null;
   let pendingEnum: { name: string; avail: AvailabilityInfo } | null = null;
   let currentScope: { name: string; isCategory: boolean } | null = null;
+  /** Standalone availability-macro line(s) waiting for the next decl. */
+  let pendingAvail: AvailabilityInfo | null = null;
   // Multiline ObjC method decls: join continuation lines (typeIdentifier: ...).
   let pendingMethod: { text: string; raw: string; lineNumber: number } | null = null;
 
@@ -881,12 +905,25 @@ export function parseObjCHeader(
       continue;
     }
 
-    // --- availability macros (inline suffixes) ---
-    const { clean, avail } = extractObjCAvailability(line);
+    // --- availability macros: inline suffixes + standalone macro lines ---
+    // Pattern 3 (old ObjC style): `API_AVAILABLE(ios(11.0))` alone on its own
+    // line applies to the decl on the NEXT line (mirrors Swift @available).
+    const { clean, avail: inlineAvail } = extractObjCAvailability(line);
     line = clean.trim();
-    if (!line || line === ';') continue;
+    if (!line || line === ';') {
+      if (inlineAvail.raw && !inEnum) {
+        pendingAvail = pendingAvail ? mergeObjCAvail(pendingAvail, inlineAvail) : inlineAvail;
+      }
+      continue;
+    }
+    // Merge standalone-line availability with inline suffixes on the decl line.
+    // Inline wins for introduced; deprecation/unavailable union.
+    const useAvail = mergeObjCAvail(pendingAvail, inlineAvail);
+    pendingAvail = null;
 
     // --- NS_ENUM member capture ---
+    // Members inherit the enum's availability (inEnum.avail from the typedef),
+    // merged with any member-level inline macro (inline wins for introduced).
     if (inEnum) {
       if (/^}/.test(line)) {
         inEnum = null;
@@ -894,7 +931,8 @@ export function parseObjCHeader(
       }
       const em = line.match(/^(\w+)\s*(=[^,]*)?,?\s*$/);
       if (em) {
-        emit(em[1], 'case', raw.trim().replace(/\s+/g, ' '), avail, lineNumber, inEnum.name, takeDoc());
+        emit(em[1], 'case', raw.trim().replace(/\s+/g, ' '),
+          mergeObjCAvail(inEnum.avail, inlineAvail), lineNumber, inEnum.name, takeDoc());
       }
       continue;
     }
@@ -912,10 +950,10 @@ export function parseObjCHeader(
     if (m) {
       const doc = takeDoc();
       if (m[2]) {
-        emit(`${m[1]}(${m[2]})`, 'extension', line, avail, lineNumber, m[1], doc);
+        emit(`${m[1]}(${m[2]})`, 'extension', line, useAvail, lineNumber, m[1], doc);
         currentScope = { name: m[1], isCategory: true };
       } else {
-        emit(m[1], 'class', line, avail, lineNumber, undefined, doc);
+        emit(m[1], 'class', line, useAvail, lineNumber, undefined, doc);
         currentScope = { name: m[1], isCategory: false };
       }
       continue;
@@ -935,7 +973,7 @@ export function parseObjCHeader(
     m = line.match(/^@protocol\s+(\w+)\s*(<[^;]*)?;?\s*$/);
     if (m) {
       if (line.endsWith(';') && !m[2]) continue; // forward declaration: skip
-      emit(m[1], 'protocol', line, avail, lineNumber, undefined, takeDoc());
+      emit(m[1], 'protocol', line, useAvail, lineNumber, undefined, takeDoc());
       currentScope = { name: m[1], isCategory: false };
       continue;
     }
@@ -944,23 +982,25 @@ export function parseObjCHeader(
       const nm = m[1].match(/(\w+)\s*(?:=\s*[^;]+)?\s*;?\s*$/)?.[1];
       if (nm) {
         const sig = optionality === 'optional' && currentScope ? `@optional ${line}` : line;
-        emit(nm, 'var', sig, avail, lineNumber, currentScope?.name, takeDoc());
+        emit(nm, 'var', sig, useAvail, lineNumber, currentScope?.name, takeDoc());
       }
       continue;
     }
     m = line.match(/^[-+]\s*\([^)]*\)\s*([\s\S]+?)\s*;?\s*$/);
     if (m) {
       const sig = optionality === 'optional' && currentScope ? `@optional ${line}` : line;
-      emit(objcSelector(m[1]), 'func', sig, avail, lineNumber, currentScope?.name, takeDoc());
+      emit(objcSelector(m[1]), 'func', sig, useAvail, lineNumber, currentScope?.name, takeDoc());
       continue;
     }
     m = line.match(/^typedef\s+(NS_ENUM|NS_OPTIONS|NS_CLOSED_ENUM)\s*\(\s*[^,]+,\s*(\w+)\s*\)\s*(\{?)\s*;?\s*$/);
     if (m) {
-      emit(m[2], 'enum', line, avail, lineNumber, undefined, takeDoc());
+      emit(m[2], 'enum', line, useAvail, lineNumber, undefined, takeDoc());
+      // Enum members inherit the enum's own availability (e.g. ARSessionRunOptions
+      // iOS 11 from the standalone macro line above the typedef).
       if (m[3] === '{' || line.includes('{')) {
-        inEnum = { name: m[2], avail };
+        inEnum = { name: m[2], avail: useAvail };
       } else {
-        pendingEnum = { name: m[2], avail };
+        pendingEnum = { name: m[2], avail: useAvail };
       }
       continue;
     }
@@ -968,18 +1008,18 @@ export function parseObjCHeader(
       const doc = takeDoc();
       const bm = line.match(/\^(\w+)/); // block typedef: (^Name)
       if (bm) {
-        emit(bm[1], 'typealias', line, avail, lineNumber, undefined, doc);
+        emit(bm[1], 'typealias', line, useAvail, lineNumber, undefined, doc);
         continue;
       }
       const tm = line.match(/(\w+)\s*;\s*$/);
       if (tm && !/^(typedef|struct|enum|union)$/.test(tm[1])) {
-        emit(tm[1], 'typealias', line, avail, lineNumber, undefined, doc);
+        emit(tm[1], 'typealias', line, useAvail, lineNumber, undefined, doc);
       }
       continue;
     }
     m = line.match(/^(?:typedef\s+)?(enum|struct|union)\s+(\w+)\s*\{?/);
     if (m && !line.includes('(')) {
-      emit(m[2], m[1] === 'struct' ? 'struct' : 'enum', line, avail, lineNumber, undefined, takeDoc());
+      emit(m[2], m[1] === 'struct' ? 'struct' : 'enum', line, useAvail, lineNumber, undefined, takeDoc());
       continue;
     }
     m = line.match(/^(extern|FOUNDATION_EXPORT|NS_EXPORT|UIKIT_EXTERN|APPKIT_EXTERN|WATCHKIT_EXTERN|SWIFT_CLASS_EXTRA)\b\s*([\s\S]*)$/);
@@ -988,16 +1028,16 @@ export function parseObjCHeader(
       const fm = rest.match(/(\w+)\s*\(/);
       const doc = takeDoc();
       if (fm && rest.includes('(') && !/typedef/.test(rest)) {
-        emit(fm[1], 'func', line, avail, lineNumber, undefined, doc);
+        emit(fm[1], 'func', line, useAvail, lineNumber, undefined, doc);
       } else {
         const vm = rest.match(/(\w+)\s*(?:\[[^\]]*\])?\s*(?:=\s*[^;]+)?\s*;?\s*$/);
-        if (vm) emit(vm[1], 'var', line, avail, lineNumber, undefined, doc);
+        if (vm) emit(vm[1], 'var', line, useAvail, lineNumber, undefined, doc);
       }
       continue;
     }
     m = line.match(/^static\s+(?:const\s+)?[\w\s:*<>]+\s+(\w+)\s*(?:=\s*[^;]+)?\s*;/);
     if (m) {
-      emit(m[1], 'var', line, avail, lineNumber, undefined, takeDoc());
+      emit(m[1], 'var', line, useAvail, lineNumber, undefined, takeDoc());
       continue;
     }
     // Unrecognized: keep pendingDoc (next decl may still own it) but cap growth.
