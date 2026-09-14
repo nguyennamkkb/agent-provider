@@ -54,6 +54,9 @@ export interface SearchResult {
 export interface TypeMember {
   name: string;
   kind: string;
+  framework: string;
+  lang?: string;
+  parentType?: string;
   signature: string;
   availability: string;
   introducedIn: number;

@@ -98,6 +98,36 @@ describe('indexer integration (fixture SDK)', () => {
     expect(names).toContain('greet');
     expect(names).toContain('greetFormal');
   });
+  it('getTypeMembers matches qualified name, excludes extension rows', () => {
+    const shortM = indexer.getTypeMembers('Greeter');
+    const qualifiedM = indexer.getTypeMembers('TestFW.Greeter');
+    expect(qualifiedM.map((x) => x.name).sort()).toEqual(shortM.map((x) => x.name).sort());
+    expect(shortM.every((x) => x.kind !== 'extension')).toBe(true);
+    expect(shortM[0]).toMatchObject({ framework: 'TestFW', parentType: 'Greeter' });
+  });
+  it('multi-version: availability filter keeps UNKNOWN, drops newer APIs', () => {
+    // greetFormal is iOS 16, GreetStyleFormal is iOS 16, GreetStyle* unannotated (UNKNOWN).
+    const at16 = indexer.search('Greet', 'TestFW', 160000).map((x) => x.name);
+    expect(at16).toContain('greetFormal');
+    expect(at16).toContain('GreetStyle'); // UNKNOWN always visible
+    const at15 = indexer.search('Greet', 'TestFW', 150000).map((x) => x.name);
+    expect(at15).not.toContain('greetFormal');
+    expect(at15).toContain('GreetStyle'); // UNKNOWN still visible
+    // iOS 18-only Swift extension member hidden at 15, visible at 18.
+    expect(indexer.search('greet', 'TestFW', 150000).map((x) => x.name)).not.toContain('greet');
+    expect(indexer.search('greet', 'TestFW', 180000).map((x) => x.name)).toContain('greet');
+  });
+  it('multi-version: getNewApis pins exact version', () => {
+    expect(indexer.getNewApis(160000, 'TestFW').every((x) => x.introducedIn === 160000)).toBe(true);
+    expect(indexer.getNewApis(160000, 'TestFW').length).toBeGreaterThan(0);
+    expect(indexer.getNewApis(150000, 'TestFW')).toHaveLength(0);
+  });
+  it('multi-version: deprecated visible only at/after deprecation version', () => {
+    expect(indexer.getDeprecated(160000, 'TestFW').find((x) => x.name === 'oldMethod')).toBeUndefined();
+    expect(indexer.getDeprecated(170000, 'TestFW').find((x) => x.name === 'oldMethod')).toMatchObject({
+      renamedTo: 'greet:',
+    });
+  });
   it('getNewApis finds iOS 18 API', () => {
     const n = indexer.getNewApis(180000, 'TestFW');
     expect(n.length).toBeGreaterThan(0);

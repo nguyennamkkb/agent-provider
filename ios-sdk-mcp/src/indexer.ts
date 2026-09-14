@@ -337,12 +337,20 @@ export class SdkIndexer {
     return rowToSymbol(results[0].values[0]);
   }
 
-  /** All members of a type (extension members carry parent_type). */
+  /**
+   * All members of a type (extension members carry parent_type).
+   * Matches short (`GridItem`) and qualified (`SwiftUI.GridItem`) names.
+   * Excludes `extension` placeholder rows (no name/signature of their own).
+   */
   getTypeMembers(typeName: string, framework?: string, limit = 200): TypeMember[] {
+    const short = typeName.includes('.') ? typeName.split('.').pop()! : typeName;
     let sql = `
-      SELECT name, kind, signature, availability, introduced_in, deprecated_in
-      FROM symbols WHERE (parent_type = ? OR parent_type LIKE ?)`;
-    const params: (string | number)[] = [typeName, `%.${typeName}`];
+      SELECT name, kind, framework, lang, parent_type, signature, availability,
+             introduced_in, deprecated_in
+      FROM symbols
+      WHERE kind != 'extension'
+        AND (parent_type = ? OR parent_type = ? OR parent_type LIKE ?)`,
+      params: (string | number)[] = [typeName, short, `%.${short}`];
     if (framework) {
       sql += ` AND framework = ?`;
       params.push(framework);
@@ -354,10 +362,13 @@ export class SdkIndexer {
     return results[0].values.map((r) => ({
       name: String(r[0]),
       kind: String(r[1]),
-      signature: String(r[2]),
-      availability: String(r[3] ?? ''),
-      introducedIn: Number(r[4]),
-      deprecatedIn: r[5] != null ? Number(r[5]) : null,
+      framework: String(r[2]),
+      lang: String(r[3] ?? ''),
+      parentType: r[4] != null ? String(r[4]) : undefined,
+      signature: String(r[5]),
+      availability: String(r[6] ?? ''),
+      introducedIn: Number(r[7]),
+      deprecatedIn: r[8] != null ? Number(r[8]) : null,
     }));
   }
 
