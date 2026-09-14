@@ -367,7 +367,7 @@ export class SdkIndexer {
              MAX(renamed_to) as renamed_to, MAX(lang) as lang,
              GROUP_CONCAT(DISTINCT platform) as platforms
       FROM symbols
-      WHERE (name LIKE ? OR signature LIKE ? OR parent_type LIKE ?)`;
+      WHERE (name LIKE ? OR parent_type LIKE ? OR signature LIKE ?)`;
     const params: (string | number)[] = [like, like, like];
 
     if (framework) {

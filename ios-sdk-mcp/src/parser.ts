@@ -312,7 +312,7 @@ function countChar(s: string, ch: string): number {
  * Strip leading attributes (@MainActor, @_disfavoredOverload, @attached(...) with
  * nested parens...) and soft modifiers (nonisolated, final, ...) before access level.
  */
-function stripLeadingAttributes(line: string): string {
+export function stripLeadingAttributes(line: string): string {
   let s = line.trimStart();
   for (;;) {
     if (s.startsWith('@')) {
@@ -354,7 +354,7 @@ function stripLeadingAttributes(line: string): string {
  * `private` are NOT public API: detect separately and skip.
  */
 const SWIFT_NONPUBLIC = /^(internal|fileprivate|private)\b/;
-function stripPublicPrefix(line: string): string | null {
+export function stripPublicPrefix(line: string): string | null {
   let s = line;
   let sawPublic = false;
   for (;;) {
@@ -402,7 +402,7 @@ interface SwiftDecl {
 }
 
 /** Match a declaration after access level was consumed. */
-function matchSwiftDecl(rest: string): SwiftDecl | null {
+export function matchSwiftDecl(rest: string): SwiftDecl | null {
   let s = rest;
 
   // `class func` / `static func` must be checked BEFORE bare `class` type decl.
@@ -441,12 +441,12 @@ function matchSwiftDecl(rest: string): SwiftDecl | null {
 }
 
 /** Remove generic params suffix: "Foo<T>" -> "Foo". */
-function cleanTypeName(tok: string): string {
+export function cleanTypeName(tok: string): string {
   return tok.replace(/<.*>$/, '').replace(/[^.\w].*$/, '');
 }
 
 /** Cut implementation bodies / trailing brace: keep clean signature. */
-function cutSignature(line: string): string {
+export function cutSignature(line: string): string {
   const idx = line.indexOf(' {');
   const sig = (idx >= 0 ? line.slice(0, idx) : line).trim();
   return sig.replace(/\s+/g, ' ');
@@ -829,7 +829,7 @@ function foldObjCMacro(kind: string, args: string, avail: AvailabilityInfo): voi
   }
 }
 
-function extractObjCAvailability(line: string): {
+export function extractObjCAvailability(line: string): {
   clean: string;
   avail: AvailabilityInfo;
   rawMacros: string[];

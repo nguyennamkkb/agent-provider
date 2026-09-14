@@ -1,7 +1,7 @@
 {
   "name": "ios-sdk-mcp",
-  "version": "0.2.0",
-  "description": "MCP server for querying iOS SDK APIs from Xcode",
+  "version": "0.4.0",
+  "description": "MCP server reading Apple SDK sources directly (no index): search, detail, members, source, grep",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -17,7 +17,6 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
-    "sql.js": "^1.11.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {

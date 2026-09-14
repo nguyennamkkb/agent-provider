@@ -1,8 +1,9 @@
-# ios-sdk-mcp
+# ios-sdk-mcp v0.4 — direct SDK mode
 
-MCP server for querying iOS SDK APIs from Xcode — optimized so an AI agent understands
-**what an API does, which iOS version introduced/deprecated it, and how to use it**
-(version metadata + usage guides, not just names).
+MCP server đọc **trực tiếp file SDK trong Xcode.app** (không index, không database).
+AI agent hiểu **API là gì, version nào, dùng thế nào** qua output đã convert gọn.
+
+Chi tiết kiến trúc: xem [DIRECT.md](DIRECT.md).
 
 ## Features
 
