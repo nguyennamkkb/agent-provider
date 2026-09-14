@@ -73,6 +73,8 @@ export interface TypeMember {
   kind: string;
   framework: string;
   lang?: string;
+  /** Platforms where this member exists (only when querying without platform filter). */
+  platforms?: SdkPlatform[];
   parentType?: string;
   signature: string;
   availability: string;

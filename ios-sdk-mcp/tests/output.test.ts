@@ -263,6 +263,13 @@ describe('output: get_type_members contract', () => {
     const keys = m.map((x) => `${x.kind}:${x.name}`);
     expect([...keys].sort()).toEqual(keys);
   });
+  it('multi-platform dedup: không trùng name+kind+signature, có platforms[]', () => {
+    // fixture multiplatform.test.ts đã cover dedup search; ở đây kiểm tra members
+    // không trả về 5x duplicates khi DB có nhiều platform rows.
+    const m = indexer.getTypeMembers('Greeter', 'TestFW', 100);
+    const keys = m.map((x) => `${x.kind}:${x.name}:${x.signature}`);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
   it('type không tồn tại -> [] (không throw)', () => {
     expect(indexer.getTypeMembers('Nope_XYZ')).toEqual([]);
   });

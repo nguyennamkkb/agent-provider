@@ -506,6 +506,11 @@ export class SdkIndexer {
    * Excludes `extension` placeholder rows; internal `_` APIs excluded by default.
    * Member rows omit the redundant `availability` raw string (detail parent has it).
    */
+  /**
+   * Members of a type. Without `platform`, rows are deduped across platforms
+   * (same name+kind+signature = one API) with platforms[] aggregated —
+   * otherwise the LIMIT is eaten by 5x duplicates and inits disappear.
+   */
   getTypeMembers(
     typeName: string,
     framework?: string,
@@ -514,13 +519,16 @@ export class SdkIndexer {
     platform?: string,
   ): TypeMember[] {
     const short = typeName.includes('.') ? typeName.split('.').pop()! : typeName;
+    const dedup = platform
+      ? `name, kind, framework, lang, parent_type, signature, availability,
+             introduced_in, deprecated_in, platform as platforms`
+      : `name, kind, framework, lang, parent_type, signature, availability,
+             introduced_in, deprecated_in, GROUP_CONCAT(DISTINCT platform) as platforms`;
     let sql = `
-      SELECT name, kind, framework, lang, parent_type, signature, availability,
-             introduced_in, deprecated_in
+      SELECT ${dedup}
       FROM symbols
       WHERE ${this.memberFilter(includeInternal)}
         AND (parent_type = ? OR parent_type = ? OR parent_type LIKE ?)`,
- 
       params: (string | number)[] = [typeName, short, `%.${short}`];
     if (framework) {
       sql += ` AND framework = ?`;
@@ -529,6 +537,8 @@ export class SdkIndexer {
     if (platform) {
       sql += ` AND platform = ?`;
       params.push(platform);
+    } else {
+      sql += ` GROUP BY name, kind, signature`;
     }
     sql += ` ORDER BY kind, name LIMIT ?`;
     params.push(Math.min(limit, 500));
@@ -544,6 +554,7 @@ export class SdkIndexer {
       availability: String(r[6] ?? ''),
       introducedIn: Number(r[7]),
       deprecatedIn: r[8] != null ? Number(r[8]) : null,
+      platforms: String(r[9] ?? '').split(',').filter(Boolean) as TypeMember['platforms'],
     }));
   }
 
