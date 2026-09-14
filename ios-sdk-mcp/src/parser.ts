@@ -98,6 +98,9 @@ export function extractAvailableInners(line: string): string[] {
   return inners;
 }
 
+/** iOS sentinel: Apple uses 100000.0 (= unrealistic future) as 'not yet deprecated'. */
+export const NOT_DEPRECATED_SENTINEL = 100000 * 10000;
+
 export function parseSwiftAvailable(inner: string): AvailabilityInfo {
   const info = unknownAvail();
   info.raw = inner.trim();
@@ -146,8 +149,14 @@ export function parseSwiftAvailable(inner: string): AvailabilityInfo {
       const gd = pairs.match(/deprecated\s*:\s*([0-9._]+)/);
       if (gd) {
         const v = parseVersionToken(gd[1]);
-        if (v !== null) info.deprecatedIn = v;
-        info.deprecated = true;
+        // 100000.0 = Apple's 'not deprecated yet' sentinel -> ignore version,
+        // but keep deprecated=true only if there is a message/rename hint.
+        if (v !== null && v < NOT_DEPRECATED_SENTINEL) info.deprecatedIn = v;
+        if (v === null || v >= NOT_DEPRECATED_SENTINEL) {
+          if (/message\s*:|renamed\s*:/.test(pairs)) info.deprecated = true;
+        } else {
+          info.deprecated = true;
+        }
       } else if (/\bdeprecated\b/.test(pairs)) {
         info.deprecated = true;
       }
@@ -268,17 +277,52 @@ function stripLeadingAttributes(line: string): string {
   return s;
 }
 
-/** Strip modifiers between access level and kind keyword. */
-function stripPostAccessModifiers(s: string): string {
-  let prev = '';
-  while (prev !== s) {
-    prev = s;
-    s = s.replace(
-      /^(static|mutating|nonmutating|consuming|borrowing|required|convenience|override|final|lazy|weak|unowned|isolated|indirect)\b\s+/,
-      '',
+/**
+ * Strip soft modifiers around access level (`nonisolated public`, `override dynamic
+ * public`, `@objc ... public`, `@_spi(Private) ...`). Bare `internal`/`fileprivate`/
+ * `private` are NOT public API: detect separately and skip.
+ */
+const SWIFT_NONPUBLIC = /^(internal|fileprivate|private)\b/;
+function stripPublicPrefix(line: string): string | null {
+  let s = line;
+  let sawPublic = false;
+  for (;;) {
+    if (s.startsWith('@')) {
+      let i = 1;
+      while (i < s.length && /[\w.]/.test(s[i])) i++;
+      s = s.slice(i).trimStart();
+      if (s.startsWith('(')) {
+        let depth = 0;
+        let j = 0;
+        let inStr = false;
+        for (; j < s.length; j++) {
+          const c = s[j];
+          if (inStr) {
+            if (c === '\\') j++;
+            else if (c === '"') inStr = false;
+            continue;
+          }
+          if (c === '"') inStr = true;
+          else if (c === '(') depth++;
+          else if (c === ')') {
+            depth--;
+            if (depth === 0) { j++; break; }
+          }
+        }
+        s = s.slice(j).trimStart();
+      }
+      continue;
+    }
+    // NOTE: `class` is a kind keyword (`open class Foo`) — matchSwiftDecl handles
+    // `class func` itself, so never eat `class`/`static` here.
+    const m = s.match(
+      /^(nonisolated|mutating|nonmutating|consuming|borrowing|final|override|dynamic|required|convenience|distributed|lazy|weak|unowned|isolated|indirect|open|package|public)\b\s*/,
     );
+    if (!m) break;
+    if (m[1] === 'public' || m[1] === 'open' || m[1] === 'package') sawPublic = true;
+    s = s.slice(m[0].length);
   }
-  return s;
+  return sawPublic ? s : null;
 }
 
 interface SwiftDecl {
@@ -288,17 +332,23 @@ interface SwiftDecl {
 
 /** Match a declaration after access level was consumed. */
 function matchSwiftDecl(rest: string): SwiftDecl | null {
-  let s = stripPostAccessModifiers(rest);
+  let s = rest;
 
-  let m = s.match(/^(class|struct|enum|protocol|actor)\s+(\w+)/);
+  // `class func` / `static func` must be checked BEFORE bare `class` type decl.
+  let m = s.match(/^(static|class)\s+func\s+(\w+|[^\w\s(:<]+)/);
+  if (m) {
+    const name = m[2];
+    return { kind: /^\w/.test(name) ? 'func' : 'operator', names: [name] };
+  }
+  m = s.match(/^(static|class)\s+(var|let)\s+(\w+)/);
+  if (m) return { kind: 'var', names: [m[3]] };
+  m = s.match(/^(class|struct|enum|protocol|actor)\s+(\w+)/);
   if (m) {
     const kind: ApiKind = m[1] === 'actor' ? 'class' : (m[1] as ApiKind);
     return { kind, names: [m[2]] };
   }
   m = s.match(/^(prefix|infix|postfix)\s+func\s+([^\s(:]+)/);
   if (m) return { kind: 'operator', names: [m[2]] };
-  // `class func` / `static func` / `static var`
-  s = s.replace(/^(static|class)\s+/, '');
   m = s.match(/^func\s+(\w+|[^\w\s(:<]+)/);
   if (m) {
     const name = m[1];
@@ -360,10 +410,16 @@ function isDeclStartLine(trimmed: string): boolean {
 
 interface Scope {
   name: string;
-  isEnum: boolean;
+  kind: 'type' | 'enum' | 'protocol' | 'extension';
   avail: AvailabilityInfo;
   /** Brace depth after the opening line. */
   depth: number;
+}
+function makeScope(name: string, kind: Scope['kind'], avail: AvailabilityInfo, depth: number): Scope {
+  return { name, kind, avail, depth };
+}
+function isEnumScope(s: Scope): boolean {
+  return s.kind === 'enum';
 }
 
 export function parseSwiftInterface(
@@ -399,6 +455,9 @@ export function parseSwiftInterface(
   let depth = 0;
 
   const popScopes = () => {
+    // Single-line decls (`public struct S {`) open AND close on the same line:
+    // don't pop the scope we just pushed (depth equal) — it ends on the next
+    // line whose brace depth returns below. Only pop strictly deeper scopes.
     while (stack.length > 0 && stack[stack.length - 1].depth > depth) stack.pop();
   };
 
@@ -461,6 +520,15 @@ export function parseSwiftInterface(
       }
     }
 
+    // Non-public decls (internal/private/fileprivate) are never indexed.
+    const nonPubProbe = stripLeadingAttributes(line);
+    if (SWIFT_NONPUBLIC.test(nonPubProbe)) {
+      pending = [];
+      depth += opens - closes;
+      popScopes();
+      continue;
+    }
+
     const stripped = stripLeadingAttributes(line);
 
     // extension Scope (availability on this line applies to all members inside)
@@ -474,17 +542,40 @@ export function parseSwiftInterface(
       const name = cleanTypeName(ext[1]);
       emit(name, 'extension', cutSignature(line), avail, lineNumber, name);
       if (opens > 0) {
-        stack.push({ name, isEnum: false, avail, depth: depth + opens - closes });
+        stack.push(makeScope(name, 'extension', avail, depth + opens - closes));
       }
       depth += opens - closes;
       popScopes();
       continue;
     }
 
-    // public / open / package declaration
-    const acc = stripped.match(/^(public|open|package)\s+([\s\S]*)$/);
-    if (acc) {
-      const decl = matchSwiftDecl(acc[2]);
+    // Swift protocol `@objc optional` / bare `optional` member marker.
+    // Must run before decl matching: `optional` is not a kind keyword.
+    if (stack.length > 0 && stack[stack.length - 1].kind === 'protocol') {
+      const noAttr = stripped
+        .replace(/^@objc\s+(optional|required)\b\s*/, '')
+        .replace(/^(optional|required)\b\s*/, '');
+      if (noAttr !== stripped) {
+        const optDecl = matchSwiftDecl(stripPublicPrefix(noAttr) ?? noAttr);
+        if (optDecl && optDecl.names.length > 0) {
+          const scope = stack[stack.length - 1];
+          const avail = inheritAvail(scope.avail, mergeAvailability(pending));
+          pending = [];
+          for (const n of optDecl.names) {
+            emit(n, optDecl.kind, `@optional ${cutSignature(line)}`, avail, lineNumber, scope.name);
+          }
+          depth += opens - closes;
+          popScopes();
+          continue;
+        }
+      }
+    }
+
+    // public / open / package declaration (modifiers may sit on both sides:
+    // `nonisolated public func`, `@objc override dynamic public init`, ...)
+    const pubRest = stripPublicPrefix(stripped);
+    if (pubRest !== null) {
+      const decl = matchSwiftDecl(pubRest);
       const scopeAvail = stack.length > 0 ? stack[stack.length - 1].avail : null;
       if (decl) {
         const avail = inheritAvail(scopeAvail, mergeAvailability(pending));
@@ -501,12 +592,12 @@ export function parseSwiftInterface(
             decl.kind === 'protocol') &&
           opens > 0
         ) {
-          stack.push({
-            name: decl.names[0],
-            isEnum: decl.kind === 'enum',
+          stack.push(makeScope(
+            decl.names[0],
+            decl.kind === 'enum' ? 'enum' : decl.kind === 'protocol' ? 'protocol' : 'type',
             avail,
-            depth: depth + opens - closes,
-          });
+            depth + opens - closes,
+          ));
         }
       } else {
         pending = []; // unrecognized public line: drop pending to avoid misattach
@@ -518,7 +609,7 @@ export function parseSwiftInterface(
 
     // enum case without access prefix, inside enum scope
     const cm = stripped.match(/^case\s+(.+)$/);
-    if (cm && stack.length > 0 && stack[stack.length - 1].isEnum) {
+    if (cm && stack.length > 0 && isEnumScope(stack[stack.length - 1])) {
       const scope = stack[stack.length - 1];
       const avail = inheritAvail(scope.avail, mergeAvailability(pending));
       pending = [];
@@ -529,6 +620,28 @@ export function parseSwiftInterface(
       depth += opens - closes;
       popScopes();
       continue;
+    }
+
+    // Bare members inside `public protocol` scope are public API
+    // (Apple emits `func runTest(...)`, `associatedtype Body`, ... bare).
+    // Bare members inside struct/class/enum/extension are NOT (internal by default).
+    // NOTE: stripPublicPrefix returns null when there is no public/open/package,
+    // so match the bare line directly with matchSwiftDecl here.
+    if (stack.length > 0 && stack[stack.length - 1].kind === 'protocol') {
+      const scope = stack[stack.length - 1];
+      const decl = matchSwiftDecl(stripped);
+      if (decl && (decl.kind === 'func' || decl.kind === 'var' || decl.kind === 'init' ||
+        decl.kind === 'operator' || decl.kind === 'typealias' ||
+        decl.kind === 'associatedtype' || decl.kind === 'macro')) {
+        const avail = inheritAvail(scope.avail, mergeAvailability(pending));
+        pending = [];
+        for (const n of decl.names) {
+          emit(n, decl.kind, cutSignature(line), avail, lineNumber, scope.name);
+        }
+        depth += opens - closes;
+        popScopes();
+        continue;
+      }
     }
 
     depth += opens - closes;
@@ -632,11 +745,14 @@ function extractObjCAvailability(line: string): {
   return { clean, avail, rawMacros: raws };
 }
 
-/** First selector chunk list: "a:(..)x b:(..)y;" -> "a:b:". Nullary -> method name. */
+/** First selector chunk list: "a:(..)x b:(..)y;" -> "a:b:". Nullary -> method name.
+ * Stops at trailing macros (NS_SWIFT_NAME(...) etc.) so they don't leak into
+ * the selector. */
 function objcSelector(cleanAfterParen: string): string {
-  const chunks = [...cleanAfterParen.matchAll(/(\w+)\s*:/g)].map((m) => m[1]);
+  const cut = cleanAfterParen.split(/\bNS_[A-Z][A-Z_0-9]*\b/)[0];
+  const chunks = [...cut.matchAll(/(\w+)\s*:/g)].map((m) => m[1]);
   if (chunks.length > 0) return chunks.map((c) => c + ':').join('');
-  return cleanAfterParen.trim().match(/^(\w+)/)?.[1] ?? 'unknown';
+  return cut.trim().match(/^(\w+)/)?.[1] ?? 'unknown';
 }
 
 export function parseObjCHeader(
@@ -651,6 +767,15 @@ export function parseObjCHeader(
   let blockBuf: string[] = [];
   let inEnum: { name: string; avail: AvailabilityInfo } | null = null;
   let pendingEnum: { name: string; avail: AvailabilityInfo } | null = null;
+  let currentScope: { name: string; isCategory: boolean } | null = null;
+  // Multiline ObjC method decls: join continuation lines (typeIdentifier: ...).
+  let pendingMethod: { text: string; raw: string; lineNumber: number } | null = null;
+
+  /**
+   * Swift `@objc optional` / bare `optional` member marker inside protocols.
+   * ObjC `@optional`/`@required` handled by the same variable.
+   */
+  let optionality: 'optional' | 'required' | null = null;
 
   const takeDoc = (): string | undefined => {
     const d = pendingDoc.slice(-15).join('\n').trim();
@@ -691,7 +816,7 @@ export function parseObjCHeader(
 
   for (let idx = 0; idx < lines.length; idx++) {
     const lineNumber = idx + 1;
-    const raw = lines[idx];
+    let raw = lines[idx];
     let line = raw.trim();
 
     // --- comments -> pendingDoc ---
@@ -740,6 +865,22 @@ export function parseObjCHeader(
     line = line.replace(/\s+\/\/.*$/, '').trim();
     if (!line) continue;
 
+    // --- multiline method join: a `-/+` line without closing `;` continues ---
+    if (pendingMethod) {
+      pendingMethod.text += ' ' + line;
+      pendingMethod.raw += ' ' + raw.trim();
+      if (/;[ \t]*(\/\/.*)?$/.test(line)) {
+        line = pendingMethod.text;
+        raw = pendingMethod.raw;
+        pendingMethod = null;
+      } else {
+        continue;
+      }
+    } else if (/^[-+]\s*\(/.test(line) && !/;[ \t]*(\/\/.*)?$/.test(line)) {
+      pendingMethod = { text: line, raw, lineNumber };
+      continue;
+    }
+
     // --- availability macros (inline suffixes) ---
     const { clean, avail } = extractObjCAvailability(line);
     line = clean.trim();
@@ -764,33 +905,53 @@ export function parseObjCHeader(
     }
     pendingEnum = null;
 
-    // --- declarations ---
-    let m = line.match(/^@interface\s+(\w+)(?:\s*\((\w+)\))?/);
+    // --- declarations (ObjC members live inside @interface..@end scope) ---
+    // @interface may carry prefix macros on the same line:
+    // `UIKIT_EXTERN API_AVAILABLE(ios(13.0)) @interface UIBezierPath ...`
+    let m = line.match(/(?:^|[\s*])@interface\s+(\w+)(?:\s*\((\w+)\))?/);
     if (m) {
       const doc = takeDoc();
-      if (m[2]) emit(`${m[1]}(${m[2]})`, 'extension', line, avail, lineNumber, m[1], doc);
-      else emit(m[1], 'class', line, avail, lineNumber, undefined, doc);
+      if (m[2]) {
+        emit(`${m[1]}(${m[2]})`, 'extension', line, avail, lineNumber, m[1], doc);
+        currentScope = { name: m[1], isCategory: true };
+      } else {
+        emit(m[1], 'class', line, avail, lineNumber, undefined, doc);
+        currentScope = { name: m[1], isCategory: false };
+      }
       continue;
     }
     if (/^@implementation\b/.test(line) || /^@end\b/.test(line)) {
       if (/^@end/.test(line)) pendingDoc = [];
+      currentScope = null;
+      optionality = null;
+      continue;
+    }
+    // @optional/@required inside protocols: sticky until the next marker
+    const optM = line.match(/^@(optional|required)\b/);
+    if (optM) {
+      optionality = optM[1] as 'optional' | 'required';
       continue;
     }
     m = line.match(/^@protocol\s+(\w+)\s*(<[^;]*)?;?\s*$/);
     if (m) {
       if (line.endsWith(';') && !m[2]) continue; // forward declaration: skip
       emit(m[1], 'protocol', line, avail, lineNumber, undefined, takeDoc());
+      currentScope = { name: m[1], isCategory: false };
       continue;
     }
     m = line.match(/^@property\s*(?:\([^)]*\))?\s*(.+?)\s*;?\s*$/);
     if (m) {
       const nm = m[1].match(/(\w+)\s*(?:=\s*[^;]+)?\s*;?\s*$/)?.[1];
-      if (nm) emit(nm, 'var', line, avail, lineNumber, undefined, takeDoc());
+      if (nm) {
+        const sig = optionality === 'optional' && currentScope ? `@optional ${line}` : line;
+        emit(nm, 'var', sig, avail, lineNumber, currentScope?.name, takeDoc());
+      }
       continue;
     }
     m = line.match(/^[-+]\s*\([^)]*\)\s*([\s\S]+?)\s*;?\s*$/);
     if (m) {
-      emit(objcSelector(m[1]), 'func', line, avail, lineNumber, undefined, takeDoc());
+      const sig = optionality === 'optional' && currentScope ? `@optional ${line}` : line;
+      emit(objcSelector(m[1]), 'func', sig, avail, lineNumber, currentScope?.name, takeDoc());
       continue;
     }
     m = line.match(/^typedef\s+(NS_ENUM|NS_OPTIONS|NS_CLOSED_ENUM)\s*\(\s*[^,]+,\s*(\w+)\s*\)\s*(\{?)\s*;?\s*$/);

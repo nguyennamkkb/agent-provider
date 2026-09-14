@@ -6,7 +6,7 @@ import {
   parseVersionToken,
   mergeAvailability,
   UNKNOWN_VERSION,
-} from './parser.js';
+} from '../src/parser.js';
 
 const FW = 'TestFW';
 const swift = (src: string) => parseSwiftInterface(src, FW, 'test.swiftinterface');
@@ -207,6 +207,21 @@ describe('objc: declarations', () => {
     const s = objc(`/*\n Manages a view.\n Second line.\n*/\n@interface MyVC : UIResponder\n@end`);
     expect(s[0]).toMatchObject({ name: 'MyVC', kind: 'class', lang: 'objc' });
     expect(s[0].docComment).toContain('Manages a view.');
+  });
+  it('members inside @interface get parentType; outside do not', () => {
+    const s = objc(`@interface Scroll : Base\n@property(nonatomic) BOOL bounces;\n- (void)reload;\n@end\n@property(nonatomic) BOOL stray;`);
+    expect(s.find((x) => x.name === 'bounces')).toMatchObject({ kind: 'var', parentType: 'Scroll' });
+    expect(s.find((x) => x.name === 'reload')).toMatchObject({ kind: 'func', parentType: 'Scroll' });
+    expect(s.find((x) => x.name === 'stray')).toMatchObject({ parentType: undefined });
+  });
+  it('category members attach to base class', () => {
+    const s = objc(`@interface Foo (Bar)\n- (void)extra;\n@end`);
+    expect(s.find((x) => x.name === 'extra')).toMatchObject({ parentType: 'Foo' });
+  });
+  it('100000.0 deprecation sentinel is ignored', () => {
+    const a = parseSwiftAvailable('iOS, introduced: 13.0, deprecated: 100000.0, message: "Use X"');
+    expect(a.introducedIn).toBe(130000);
+    expect(a.deprecatedIn).toBeNull();
   });
   it('category becomes extension', () => {
     const s = objc(`@interface Foo (Bar)\n@end`);
