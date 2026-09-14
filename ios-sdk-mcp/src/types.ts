@@ -63,12 +63,23 @@ export interface TypeMember {
   deprecatedIn: number | null;
 }
 
+/** Compact member row for detail output: no redundant framework/lang/parent/availability. */
+export interface MemberSummary {
+  name: string;
+  kind: string;
+  signature: string;
+  introducedIn: number;
+  deprecatedIn?: number;
+  renamedTo?: string;
+}
+
 export interface ApiDetail extends ApiSymbol {
-  /** Direct members (methods, properties, inits, cases...) for class/struct/enum/protocol. */
-  members: TypeMember[];
+  /** Top direct members (compact, internal `_` APIs excluded by default). */
+  members: MemberSummary[];
+  /** Total member count (same filter) — call get_type_members for the full list. */
   memberCount: number;
-  /** `renamedTo` target resolved to its own declaration, if present in the index. */
-  renamedToDetail?: ApiSymbol | null;
+  /** `renamedTo` target resolved to its own declaration (members stripped), if present. */
+  renamedToDetail?: (ApiSymbol & { memberCount: number }) | null;
 }
 
 export interface DeprecatedApi extends SearchResult {

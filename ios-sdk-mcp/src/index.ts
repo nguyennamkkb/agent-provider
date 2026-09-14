@@ -67,9 +67,10 @@ server.tool(
   {
     name: z.string().describe('API name (e.g. "LanguageModelSession")'),
     framework: z.string().optional().describe('Framework name for disambiguation'),
+    include_internal: z.boolean().optional().describe('Include internal _-prefixed members (default false)'),
   },
-  async ({ name, framework }) => {
-    const detail = indexer.getDetail(name, framework);
+  async ({ name, framework, include_internal }) => {
+    const detail = indexer.getDetail(name, framework, include_internal ?? false);
     if (!detail) {
       return { content: [{ type: 'text', text: `API "${name}" not found` }] };
     }
@@ -84,9 +85,10 @@ server.tool(
   {
     name: z.string().describe('Type name, short or qualified (e.g. "View" or "SwiftUICore.View")'),
     framework: z.string().optional().describe('Filter by framework'),
+    include_internal: z.boolean().optional().describe('Include internal _-prefixed Apple APIs (default false)'),
   },
-  async ({ name, framework }) => {
-    const members = indexer.getTypeMembers(name, framework);
+  async ({ name, framework, include_internal }) => {
+    const members = indexer.getTypeMembers(name, framework, 200, include_internal ?? false);
     if (members.length === 0) {
       return { content: [{ type: 'text', text: `No members found for type "${name}"` }] };
     }

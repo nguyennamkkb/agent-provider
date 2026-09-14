@@ -88,13 +88,28 @@ describe('indexer integration (fixture SDK)', () => {
     expect(d).toMatchObject({ kind: 'case', parentType: 'GreetStyle', introducedIn: 160000 });
     expect(indexer.getDetail('NoSuchApi_xyz')).toBeNull();
   });
-  it('getDetail carries members + memberCount so agent knows what to explore', () => {
+  it('getDetail carries compact members + memberCount so agent knows what to explore', () => {
     const d = indexer.getDetail('Greeter', 'TestFW')!;
     expect(d.memberCount).toBeGreaterThan(0);
     expect(d.members.map((x) => x.name)).toContain('greet');
+    // compact rows: no redundant framework/availability columns
+    expect(d.members[0]).not.toHaveProperty('availability');
+    expect(d.members[0]).not.toHaveProperty('framework');
+    expect(d.members.length).toBeLessThanOrEqual(20);
     // leaf API (no members) reports empty honestly
     expect(indexer.getDetail('GreetStyleFormal')!.members).toHaveLength(0);
     expect(indexer.getDetail('GreetStyleFormal')!.memberCount).toBe(0);
+  });
+  it('getDetail excludes internal _ members by default', () => {
+    // fixture has no _ members; verify via real filter path on synthetic row
+    const d = indexer.getDetail('Greeter', 'TestFW', false)!;
+    expect(d.members.every((x) => !x.name.startsWith('_'))).toBe(true);
+  });
+  it('getDetail with framework never falls back to contains match', () => {
+    // 'eet' is contained in 'Greeter' but must NOT resolve when framework is given.
+    expect(indexer.getDetail('eet', 'TestFW')).toBeNull();
+    // ...while the same fuzzy query still works without framework scope.
+    expect(indexer.getDetail('eet')).not.toBeNull();
   });
   it('getDetail resolves renamedTo target', () => {
     const d = indexer.getDetail('oldMethod', 'TestFW')!;

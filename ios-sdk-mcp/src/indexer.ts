@@ -313,7 +313,12 @@ export class SdkIndexer {
   /** Concrete declarations rank above extensions/members with the same name. */
   private static readonly RANK = `CASE kind WHEN 'class' THEN 0 WHEN 'struct' THEN 1 WHEN 'enum' THEN 2 WHEN 'protocol' THEN 3 WHEN 'macro' THEN 4 WHEN 'func' THEN 5 WHEN 'var' THEN 6 WHEN 'typealias' THEN 7 WHEN 'init' THEN 8 WHEN 'case' THEN 9 WHEN 'associatedtype' THEN 10 ELSE 11 END, CASE WHEN kind = 'extension' THEN 1 ELSE 0 END`;
 
-  getDetail(name: string, framework?: string): ApiSymbol | null {
+  /** Shared member filter: skip extension placeholders + internal `_` APIs unless asked. */
+  private memberFilter(includeInternal: boolean): string {
+    return `kind != 'extension'${includeInternal ? '' : ` AND name NOT LIKE '\\_%' ESCAPE '\\'`}`;
+  }
+
+  getDetail(name: string, framework?: string, includeInternal = false): ApiDetail | null {
     let sql = `SELECT * FROM symbols WHERE name = ?`;
     const params: string[] = [name];
     if (framework) {
@@ -323,35 +328,59 @@ export class SdkIndexer {
     sql += ` ORDER BY ${SdkIndexer.RANK} LIMIT 1`;
     let results = this.db.exec(sql, params);
     if (results.length === 0 || results[0].values.length === 0) {
-      // fallback: contains match, exact-name ranked first
-      let sql2 = `SELECT * FROM symbols WHERE name LIKE ?`;
-      const params2: string[] = [`%${name}%`];
-      if (framework) {
-        sql2 += ` AND framework = ?`;
-        params2.push(framework);
-      }
-      sql2 += ` ORDER BY CASE WHEN name = ? THEN 0 ELSE 1 END, ${SdkIndexer.RANK} LIMIT 1`;
-      params2.push(name);
-      results = this.db.exec(sql2, params2);
+      // Without framework: contains fallback. With framework: no fallback —
+      // a contains match (e.g. 'View' -> '_PreviewHost') misleads more than null.
+      if (framework) return null;
+      const params2: string[] = [`%${name}%`, name];
+      results = this.db.exec(
+        `SELECT * FROM symbols WHERE name LIKE ?
+         ORDER BY CASE WHEN name = ? THEN 0 ELSE 1 END, ${SdkIndexer.RANK} LIMIT 1`,
+        params2,
+      );
     }
     if (results.length === 0 || results[0].values.length === 0) return null;
     const sym = rowToSymbol(results[0].values[0]);
-    // Detail carries members so the agent knows what to explore next.
-    // Query members directly (not via this.getTypeMembers) to keep the
-    // framework scope of the resolved symbol.
+    // Compact top-20 member summaries so the agent knows what to explore next.
+    // Full list lives behind get_type_members.
+    const filter = this.memberFilter(includeInternal);
+    const short = sym.name.includes('.') ? sym.name.split('.').pop()! : sym.name;
+    const mrows = this.db.exec(
+      `SELECT name, kind, signature, introduced_in, deprecated_in, renamed_to
+       FROM symbols
+       WHERE ${filter} AND framework = ?
+         AND (parent_type = ? OR parent_type = ? OR parent_type LIKE ?)
+       ORDER BY kind, name LIMIT 20`,
+      [sym.framework, sym.name, short, `%.${short}`],
+    );
+    const members = (mrows.length === 0 ? [] : mrows[0].values).map((r) => ({
+      name: String(r[0]),
+      kind: String(r[1]),
+      signature: String(r[2]),
+      introducedIn: Number(r[3]),
+      ...(r[4] != null ? { deprecatedIn: Number(r[4]) } : {}),
+      ...(r[5] != null ? { renamedTo: String(r[5]) } : {}),
+    }));
+    const cnt = this.db.exec(
+      `SELECT COUNT(*) FROM symbols
+       WHERE ${filter} AND framework = ?
+         AND (parent_type = ? OR parent_type = ? OR parent_type LIKE ?)`,
+      [sym.framework, sym.name, short, `%.${short}`],
+    );
     const detail: ApiDetail = {
       ...sym,
-      members: this.getTypeMembers(sym.name, sym.framework, 100),
-      memberCount: 0,
+      members,
+      memberCount: Number(cnt[0]?.values[0]?.[0] ?? members.length),
     };
-    const cnt = this.db.exec(
-      `SELECT COUNT(*) FROM symbols WHERE kind != 'extension'
-       AND (parent_type = ? OR parent_type LIKE ?)`,
-      [sym.name, `%.${sym.name}`],
-    );
-    detail.memberCount = Number(cnt[0]?.values[0]?.[0] ?? detail.members.length);
     if (sym.renamedTo) {
-      detail.renamedToDetail = this.getDetail(sym.renamedTo, sym.framework) ?? null;
+      // Resolve target but strip its members (avoid recursive bloat);
+      // memberCount tells the agent whether the target is worth opening.
+      const target = this.getDetail(sym.renamedTo, sym.framework);
+      if (target) {
+        const { members: _drop, renamedToDetail: _drop2, ...targetBase } = target;
+        detail.renamedToDetail = { ...targetBase, memberCount: target.memberCount };
+      } else {
+        detail.renamedToDetail = null;
+      }
     }
     return detail;
   }
@@ -359,15 +388,21 @@ export class SdkIndexer {
   /**
    * All members of a type (extension members carry parent_type).
    * Matches short (`GridItem`) and qualified (`SwiftUI.GridItem`) names.
-   * Excludes `extension` placeholder rows (no name/signature of their own).
+   * Excludes `extension` placeholder rows; internal `_` APIs excluded by default.
+   * Member rows omit the redundant `availability` raw string (detail parent has it).
    */
-  getTypeMembers(typeName: string, framework?: string, limit = 200): TypeMember[] {
+  getTypeMembers(
+    typeName: string,
+    framework?: string,
+    limit = 200,
+    includeInternal = false,
+  ): TypeMember[] {
     const short = typeName.includes('.') ? typeName.split('.').pop()! : typeName;
     let sql = `
-      SELECT name, kind, framework, lang, parent_type, signature, availability,
+      SELECT name, kind, framework, lang, parent_type, signature,
              introduced_in, deprecated_in
       FROM symbols
-      WHERE kind != 'extension'
+      WHERE ${this.memberFilter(includeInternal)}
         AND (parent_type = ? OR parent_type = ? OR parent_type LIKE ?)`,
       params: (string | number)[] = [typeName, short, `%.${short}`];
     if (framework) {
@@ -385,9 +420,9 @@ export class SdkIndexer {
       lang: String(r[3] ?? ''),
       parentType: r[4] != null ? String(r[4]) : undefined,
       signature: String(r[5]),
-      availability: String(r[6] ?? ''),
-      introducedIn: Number(r[7]),
-      deprecatedIn: r[8] != null ? Number(r[8]) : null,
+      availability: '',
+      introducedIn: Number(r[6]),
+      deprecatedIn: r[7] != null ? Number(r[7]) : null,
     }));
   }
 
