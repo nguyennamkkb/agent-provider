@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { parseSwiftInterface, parseObjCHeader, UNKNOWN_VERSION } from './parser.js';
 import type {
+  ApiDetail,
   ApiSymbol,
   DeprecatedApi,
   DocGuide,
@@ -334,7 +335,25 @@ export class SdkIndexer {
       results = this.db.exec(sql2, params2);
     }
     if (results.length === 0 || results[0].values.length === 0) return null;
-    return rowToSymbol(results[0].values[0]);
+    const sym = rowToSymbol(results[0].values[0]);
+    // Detail carries members so the agent knows what to explore next.
+    // Query members directly (not via this.getTypeMembers) to keep the
+    // framework scope of the resolved symbol.
+    const detail: ApiDetail = {
+      ...sym,
+      members: this.getTypeMembers(sym.name, sym.framework, 100),
+      memberCount: 0,
+    };
+    const cnt = this.db.exec(
+      `SELECT COUNT(*) FROM symbols WHERE kind != 'extension'
+       AND (parent_type = ? OR parent_type LIKE ?)`,
+      [sym.name, `%.${sym.name}`],
+    );
+    detail.memberCount = Number(cnt[0]?.values[0]?.[0] ?? detail.members.length);
+    if (sym.renamedTo) {
+      detail.renamedToDetail = this.getDetail(sym.renamedTo, sym.framework) ?? null;
+    }
+    return detail;
   }
 
   /**

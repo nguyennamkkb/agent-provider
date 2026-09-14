@@ -63,7 +63,7 @@ server.tool(
 // get_api_detail
 server.tool(
   'get_api_detail',
-  'Get full details of a specific iOS SDK API (signature, versions, deprecation, docs)',
+  'Get full details of a specific iOS SDK API: signature, versions, deprecation, plus its member list (methods/properties/inits) so you know what to explore next',
   {
     name: z.string().describe('API name (e.g. "LanguageModelSession")'),
     framework: z.string().optional().describe('Framework name for disambiguation'),

@@ -63,6 +63,14 @@ export interface TypeMember {
   deprecatedIn: number | null;
 }
 
+export interface ApiDetail extends ApiSymbol {
+  /** Direct members (methods, properties, inits, cases...) for class/struct/enum/protocol. */
+  members: TypeMember[];
+  memberCount: number;
+  /** `renamedTo` target resolved to its own declaration, if present in the index. */
+  renamedToDetail?: ApiSymbol | null;
+}
+
 export interface DeprecatedApi extends SearchResult {
   unavailable: boolean;
   obsoletedIn: number | null;

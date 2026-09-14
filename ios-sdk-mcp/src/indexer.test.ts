@@ -88,6 +88,19 @@ describe('indexer integration (fixture SDK)', () => {
     expect(d).toMatchObject({ kind: 'case', parentType: 'GreetStyle', introducedIn: 160000 });
     expect(indexer.getDetail('NoSuchApi_xyz')).toBeNull();
   });
+  it('getDetail carries members + memberCount so agent knows what to explore', () => {
+    const d = indexer.getDetail('Greeter', 'TestFW')!;
+    expect(d.memberCount).toBeGreaterThan(0);
+    expect(d.members.map((x) => x.name)).toContain('greet');
+    // leaf API (no members) reports empty honestly
+    expect(indexer.getDetail('GreetStyleFormal')!.members).toHaveLength(0);
+    expect(indexer.getDetail('GreetStyleFormal')!.memberCount).toBe(0);
+  });
+  it('getDetail resolves renamedTo target', () => {
+    const d = indexer.getDetail('oldMethod', 'TestFW')!;
+    expect(d.renamedTo).toBe('greet:');
+    expect(d.renamedToDetail).toMatchObject({ name: 'greet:' });
+  });
   it('objc doc comment captured', () => {
     const d = indexer.getDetail('greet:');
     expect(d!.docComment).toContain('Says hello.');
