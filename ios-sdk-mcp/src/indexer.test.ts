@@ -17,6 +17,13 @@ extension Greeter {
 public struct OldGreeter {
   public init()
 }
+@available(iOS 18.0, macOS 15.0, *)
+public struct GreeterBox {
+  public init()
+  nonisolated public func greet(name: Swift.String) -> Swift.String
+  @available(iOS 16.0, macOS 13.0, *)
+  nonisolated public func greetFormal(name: Swift.String) -> Swift.String
+}
 `;
 
 const OBJC_FIXTURE = `// Greets people.
@@ -89,14 +96,20 @@ describe('indexer integration (fixture SDK)', () => {
     expect(indexer.getDetail('NoSuchApi_xyz')).toBeNull();
   });
   it('getDetail carries compact members + memberCount so agent knows what to explore', () => {
-    const d = indexer.getDetail('Greeter', 'TestFW')!;
+    // GreeterBox is a struct (semantic parent) — greet inherits iOS 18,
+    // greetFormal overrides with its own iOS 16 availability.
+    const d = indexer.getDetail('GreeterBox', 'TestFW')!;
     expect(d.memberCount).toBeGreaterThan(0);
     expect(d.members.map((x) => x.name)).toContain('greet');
-    // compact rows: no redundant framework/availability columns
-    expect(d.members[0]).not.toHaveProperty('availability');
+    // compact rows: no redundant framework column; availability only on override
     expect(d.members[0]).not.toHaveProperty('framework');
     expect(d.members.length).toBeLessThanOrEqual(20);
-    // leaf API (no members) reports empty honestly
+    const formal = d.members.find((x) => x.name === 'greetFormal')!;
+    expect(formal.availability).toContain('iOS 16.0');
+    // inherited members (same version as parent type) omit availability
+    expect(d.members.find((x) => x.name === 'greet')).not.toHaveProperty('availability');
+  });
+  it('getDetail leaf API reports empty members honestly', () => {
     expect(indexer.getDetail('GreetStyleFormal')!.members).toHaveLength(0);
     expect(indexer.getDetail('GreetStyleFormal')!.memberCount).toBe(0);
   });

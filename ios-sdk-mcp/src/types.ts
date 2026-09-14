@@ -63,11 +63,14 @@ export interface TypeMember {
   deprecatedIn: number | null;
 }
 
-/** Compact member row for detail output: no redundant framework/lang/parent/availability. */
+/** Compact member row for detail output: no redundant framework/lang/parent.
+ * `availability` included only when it differs from the parent type's
+ * (members can have their own @available, e.g. GridItem.== is iOS 26 in a iOS 14 type). */
 export interface MemberSummary {
   name: string;
   kind: string;
   signature: string;
+  availability?: string;
   introducedIn: number;
   deprecatedIn?: number;
   renamedTo?: string;

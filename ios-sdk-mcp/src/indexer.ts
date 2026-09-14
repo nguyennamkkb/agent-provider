@@ -345,21 +345,43 @@ export class SdkIndexer {
     const filter = this.memberFilter(includeInternal);
     const short = sym.name.includes('.') ? sym.name.split('.').pop()! : sym.name;
     const mrows = this.db.exec(
-      `SELECT name, kind, signature, introduced_in, deprecated_in, renamed_to
+      `SELECT name, kind, signature, availability, introduced_in, deprecated_in, renamed_to
        FROM symbols
        WHERE ${filter} AND framework = ?
          AND (parent_type = ? OR parent_type = ? OR parent_type LIKE ?)
        ORDER BY kind, name LIMIT 20`,
       [sym.framework, sym.name, short, `%.${short}`],
     );
-    const members = (mrows.length === 0 ? [] : mrows[0].values).map((r) => ({
-      name: String(r[0]),
-      kind: String(r[1]),
-      signature: String(r[2]),
-      introducedIn: Number(r[3]),
-      ...(r[4] != null ? { deprecatedIn: Number(r[4]) } : {}),
-      ...(r[5] != null ? { renamedTo: String(r[5]) } : {}),
-    }));
+    // Resolve semantic parent version first: for extension rows the type decl
+    // (class/struct/enum/protocol, else the extension itself) defines inheritance.
+    let parentIntro = sym.introducedIn;
+    let parentAvail = sym.availability;
+    if (sym.kind === 'extension' && sym.parentType) {
+      const trows = this.db.exec(
+        `SELECT availability, introduced_in FROM symbols
+         WHERE kind != 'extension' AND framework = ?
+           AND (name = ? OR name LIKE ?)
+         ORDER BY ${SdkIndexer.RANK} LIMIT 1`,
+        [sym.framework, sym.parentType, `%.${sym.parentType}`],
+      );
+      if (trows.length > 0 && trows[0].values.length > 0) {
+        parentAvail = String(trows[0].values[0][0] ?? '');
+        parentIntro = Number(trows[0].values[0][1]);
+      }
+    }
+    const members = (mrows.length === 0 ? [] : mrows[0].values)
+      .map((r) => ({
+        name: String(r[0]),
+        kind: String(r[1]),
+        signature: String(r[2]),
+        // availability only on member-level override (different version than parent)
+        ...(r[3] != null && (String(r[3]) !== parentAvail || Number(r[4]) !== parentIntro)
+          ? { availability: String(r[3]) }
+          : {}),
+        introducedIn: Number(r[4]),
+        ...(r[5] != null ? { deprecatedIn: Number(r[5]) } : {}),
+        ...(r[6] != null ? { renamedTo: String(r[6]) } : {}),
+      }));
     const cnt = this.db.exec(
       `SELECT COUNT(*) FROM symbols
        WHERE ${filter} AND framework = ?
@@ -399,11 +421,12 @@ export class SdkIndexer {
   ): TypeMember[] {
     const short = typeName.includes('.') ? typeName.split('.').pop()! : typeName;
     let sql = `
-      SELECT name, kind, framework, lang, parent_type, signature,
+      SELECT name, kind, framework, lang, parent_type, signature, availability,
              introduced_in, deprecated_in
       FROM symbols
       WHERE ${this.memberFilter(includeInternal)}
         AND (parent_type = ? OR parent_type = ? OR parent_type LIKE ?)`,
+ 
       params: (string | number)[] = [typeName, short, `%.${short}`];
     if (framework) {
       sql += ` AND framework = ?`;
@@ -420,9 +443,9 @@ export class SdkIndexer {
       lang: String(r[3] ?? ''),
       parentType: r[4] != null ? String(r[4]) : undefined,
       signature: String(r[5]),
-      availability: '',
-      introducedIn: Number(r[6]),
-      deprecatedIn: r[7] != null ? Number(r[7]) : null,
+      availability: String(r[6] ?? ''),
+      introducedIn: Number(r[7]),
+      deprecatedIn: r[8] != null ? Number(r[8]) : null,
     }));
   }
 
