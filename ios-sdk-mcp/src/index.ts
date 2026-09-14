@@ -4,24 +4,22 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import * as fs from 'fs';
 import { fileURLToPath } from 'url';
-import { SdkIndexer } from './indexer.js';
-
-const DEFAULT_SDK = '/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk';
+import { SdkIndexer, SDK_PATHS } from './indexer.js';
+import type { SdkPlatform } from './types.js';
 
 const server = new McpServer({
   name: 'ios-sdk-mcp',
-  version: '0.2.0',
+  version: '0.3.0',
 });
 
-const sdkPath = process.env.IOS_SDK_PATH || DEFAULT_SDK;
-const indexPath = process.env.IOS_INDEX_PATH; // optional persistent cache
+const indexPath = process.env.IOS_INDEX_PATH; // persistent multi-platform cache
 
-console.error(`Opening SDK index (sdk=${sdkPath})...`);
+console.error('Opening SDK index...');
 const indexer = await SdkIndexer.create(indexPath);
 
 if (indexer.isEmpty()) {
-  console.error('Empty index, building from SDK (one-time, ~seconds)...');
-  indexer.buildIndex(sdkPath);
+  console.error('Empty index, building from all platform SDKs (one-time, ~1 min)...');
+  indexer.buildAll();
   // Docs layer: usage guides / examples (RESEARCH.md section 5)
   const docsEnv = process.env.IOS_DOCS_PATH;
   const repoKnowledge = fileURLToPath(new URL('../../ios27-full-knowledge.md', import.meta.url));
@@ -42,20 +40,25 @@ if (indexer.isEmpty()) {
     console.error(`Index cached at ${indexPath}`);
   }
 }
+console.error(`SDKs: ${JSON.stringify(Object.keys(SDK_PATHS))}`);
 console.error('Index ready.');
 
-// search_apis: ranked (exact > prefix > contains)
+const platformDesc =
+  'Platform filter: ios (iPhone/iPad), watchos (Watch app, WidgetKit complications, ClockKit), macos, tvos, xros (visionOS). Omit to search all.';
+
+// search_apis: ranked (exact > prefix > contains), deduped across platforms
 server.tool(
   'search_apis',
-  'Search iOS SDK APIs by name, framework, or keyword. Ranked: exact match first.',
+  'Search Apple SDK APIs by name, framework, or keyword. Ranked: exact match first. Same API on many platforms is merged with a platforms list.',
   {
-    query: z.string().describe('Search keyword (e.g. "glassEffect", "LanguageModelSession")'),
+    query: z.string().describe('Search keyword (e.g. "glassEffect", "WKInterfaceController", "TimelineEntry")'),
     framework: z.string().optional().describe('Filter by framework name'),
     ios_version: z.number().optional().describe('Only APIs available in this iOS version (e.g. 260000 for iOS 26)'),
     kind: z.string().optional().describe('Filter by kind: class, struct, enum, protocol, func, var, macro, typealias, case'),
+    platform: z.string().optional().describe(platformDesc),
   },
-  async ({ query, framework, ios_version, kind }) => {
-    const results = indexer.search(query, framework, ios_version, kind);
+  async ({ query, framework, ios_version, kind, platform }) => {
+    const results = indexer.search(query, framework, ios_version, kind, 50, platform);
     return { content: [{ type: 'text', text: JSON.stringify(results, null, 2) }] };
   },
 );
@@ -63,14 +66,15 @@ server.tool(
 // get_api_detail
 server.tool(
   'get_api_detail',
-  'Get full details of a specific iOS SDK API: signature, versions, deprecation, plus its member list (methods/properties/inits) so you know what to explore next',
+  'Get full details of a specific Apple SDK API: signature, platforms, versions, deprecation, plus its member list (methods/properties/inits) so you know what to explore next',
   {
-    name: z.string().describe('API name (e.g. "LanguageModelSession")'),
+    name: z.string().describe('API name (e.g. "WKInterfaceController", "TimelineEntry")'),
     framework: z.string().optional().describe('Framework name for disambiguation'),
     include_internal: z.boolean().optional().describe('Include internal _-prefixed members (default false)'),
+    platform: z.string().optional().describe(platformDesc),
   },
-  async ({ name, framework, include_internal }) => {
-    const detail = indexer.getDetail(name, framework, include_internal ?? false);
+  async ({ name, framework, include_internal, platform }) => {
+    const detail = indexer.getDetail(name, framework, include_internal ?? false, platform as SdkPlatform | undefined);
     if (!detail) {
       return { content: [{ type: 'text', text: `API "${name}" not found` }] };
     }
@@ -78,7 +82,7 @@ server.tool(
   },
 );
 
-// get_type_members (replaces get_type_hierarchy)
+// get_type_members
 server.tool(
   'get_type_members',
   'List all members of a type (methods, properties, cases) via parent_type',
@@ -86,9 +90,10 @@ server.tool(
     name: z.string().describe('Type name, short or qualified (e.g. "View" or "SwiftUICore.View")'),
     framework: z.string().optional().describe('Filter by framework'),
     include_internal: z.boolean().optional().describe('Include internal _-prefixed Apple APIs (default false)'),
+    platform: z.string().optional().describe(platformDesc),
   },
-  async ({ name, framework, include_internal }) => {
-    const members = indexer.getTypeMembers(name, framework, 200, include_internal ?? false);
+  async ({ name, framework, include_internal, platform }) => {
+    const members = indexer.getTypeMembers(name, framework, 200, include_internal ?? false, platform);
     if (members.length === 0) {
       return { content: [{ type: 'text', text: `No members found for type "${name}"` }] };
     }
@@ -99,13 +104,14 @@ server.tool(
 // list_frameworks
 server.tool(
   'list_frameworks',
-  'List all iOS SDK frameworks with API counts',
+  'List all Apple SDK frameworks with API counts and the platforms each exists on',
   {
     ios_version: z.number().optional().describe('Show only frameworks available up to this version'),
     new_only: z.boolean().optional().describe('Show only new frameworks (iOS 26+)'),
+    platform: z.string().optional().describe(platformDesc),
   },
-  async ({ ios_version, new_only }) => {
-    let frameworks = indexer.listFrameworks();
+  async ({ ios_version, new_only, platform }) => {
+    let frameworks = indexer.listFrameworks(platform);
     if (ios_version) frameworks = frameworks.filter((f) => f.minIOSVersion <= ios_version);
     if (new_only) frameworks = frameworks.filter((f) => f.isNew);
     return { content: [{ type: 'text', text: JSON.stringify(frameworks, null, 2) }] };
@@ -119,33 +125,35 @@ server.tool(
   {
     ios_version: z.number().describe('iOS version (e.g. 260000 for iOS 26)'),
     framework: z.string().optional().describe('Filter by framework'),
+    platform: z.string().optional().describe(platformDesc),
   },
-  async ({ ios_version, framework }) => {
-    const results = indexer.getNewApis(ios_version, framework);
+  async ({ ios_version, framework, platform }) => {
+    const results = indexer.getNewApis(ios_version, framework, platform);
     return { content: [{ type: 'text', text: JSON.stringify(results, null, 2) }] };
   },
 );
 
-// get_deprecated (new)
+// get_deprecated
 server.tool(
   'get_deprecated',
   'Get deprecated/obsoleted/unavailable APIs with renamed_to for code migration',
   {
     ios_version: z.number().describe('iOS version to check against (e.g. 260000)'),
     framework: z.string().optional().describe('Filter by framework'),
+    platform: z.string().optional().describe(platformDesc),
   },
-  async ({ ios_version, framework }) => {
-    const results = indexer.getDeprecated(ios_version, framework);
+  async ({ ios_version, framework, platform }) => {
+    const results = indexer.getDeprecated(ios_version, framework, platform);
     return { content: [{ type: 'text', text: JSON.stringify(results, null, 2) }] };
   },
 );
 
-// get_guide (new): usage guides from docs layer
+// get_guide: usage guides from docs layer
 server.tool(
   'get_guide',
   'Get usage guides and code examples for a topic or API from the knowledge docs',
   {
-    query: z.string().describe('Topic or API name (e.g. "Liquid Glass", "FoundationModels", "glassEffect")'),
+    query: z.string().describe('Topic or API name (e.g. "Liquid Glass", "WidgetKit", "TimelineEntry", "Watch app")'),
   },
   async ({ query }) => {
     const guides = indexer.getGuide(query);
@@ -159,7 +167,7 @@ server.tool(
 // get_sdk_stats
 server.tool(
   'get_sdk_stats',
-  'Get overview statistics of the indexed iOS SDK (coverage, kinds, languages)',
+  'Get overview statistics of the indexed Apple SDKs (coverage, kinds, languages, platforms)',
   {},
   async () => {
     const stats = indexer.getStats();

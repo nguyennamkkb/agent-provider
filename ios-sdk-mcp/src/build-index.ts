@@ -1,13 +1,14 @@
 #!/usr/bin/env node
 /**
- * One-time index builder: SDK symbols + docs layer -> SQLite file.
+ * One-time index builder: all platform SDKs + docs layer -> SQLite file.
  * MCP server (index.ts) opens this file read-only for instant startup.
  *
  * Usage:
- *   npm run build-index -- --out symbols.db [--sdk <path>] [--docs <dir-or-md>]
+ *   npm run build-index -- --out symbols.db [--platforms ios,watchos] [--docs <dir-or-md>]
  */
 import * as fs from 'fs';
 import { SdkIndexer } from './indexer.js';
+import type { SdkPlatform } from './types.js';
 
 const args = process.argv.slice(2);
 const opt = (name: string): string | undefined => {
@@ -15,16 +16,15 @@ const opt = (name: string): string | undefined => {
   return i >= 0 ? args[i + 1] : undefined;
 };
 
-const sdkPath =
-  opt('--sdk') ||
-  process.env.IOS_SDK_PATH ||
-  '/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk';
 const outPath = opt('--out') || process.env.IOS_INDEX_PATH || 'symbols.db';
 const docsPath = opt('--docs') || process.env.IOS_DOCS_PATH;
+const platforms = (opt('--platforms')?.split(',') ??
+  process.env.PLATFORMS?.split(',') ?? undefined) as SdkPlatform[] | undefined;
 
 const indexer = await SdkIndexer.create();
 const t0 = Date.now();
-indexer.buildIndex(sdkPath);
+const total = indexer.buildAll(platforms);
+console.error(`Total: ${total} symbols`);
 
 let docSections = 0;
 const loadMd = (f: string) => {

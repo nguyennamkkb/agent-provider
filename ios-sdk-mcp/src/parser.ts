@@ -1,4 +1,4 @@
-import type { ApiKind, ApiSymbol } from './types.js';
+import type { ApiKind, ParsedSymbol } from './types.js';
 
 /** Version unknown / unparseable. */
 export const UNKNOWN_VERSION = 999999;
@@ -19,6 +19,8 @@ export interface AvailabilityInfo {
   renamedTo?: string;
   unavailable: boolean;
   deprecated: boolean;
+  /** Per-platform introduced versions: { ios, watchos, macos, tvos, xros }. */
+  platforms?: Partial<Record<string, number>>;
 }
 
 export function unknownAvail(): AvailabilityInfo {
@@ -122,11 +124,44 @@ export function parseSwiftAvailable(inner: string): AvailabilityInfo {
       segs.push(s);
     }
   }
+  // Map @available platform names to SdkPlatform keys.
+  const platKey = (p: string): string | null => {
+    switch (p) {
+      case 'iOS': return 'ios';
+      case 'watchOS': return 'watchos';
+      case 'macOS': case 'macCatalyst': return 'macos';
+      case 'tvOS': return 'tvos';
+      case 'visionOS': return 'xros';
+      default: return null;
+    }
+  };
+  // When @available has no iOS segment at all (watchOS-only API), fall back to
+  // the first recorded platform version so introducedIn stays meaningful.
+  const fallbackIntroduced = () => {
+    if (info.introducedIn !== UNKNOWN_VERSION || !info.platforms) return;
+    const vs = Object.values(info.platforms).filter((v): v is number => typeof v === 'number');
+    if (vs.length > 0) info.introducedIn = Math.min(...vs);
+  };
+  const notePlatform = (p: string, v: number | null) => {
+    const k = platKey(p);
+    if (k && v !== null) {
+      info.platforms = info.platforms ?? {};
+      const cur = (info.platforms as Record<string, number | undefined>)[k];
+      if (cur === undefined || v < cur) (info.platforms as Record<string, number | undefined>)[k] = v;
+    }
+  };
   for (const seg of segs) {
     const t = seg;
-    // Other-platform segments (tvOS/watchOS/...) do not affect iOS status.
     const pm = t.match(/^(iOS|macOS|macCatalyst|tvOS|watchOS|visionOS)\b/);
-    if (pm && pm[1] !== 'iOS') continue;
+    if (pm && pm[1] !== 'iOS') {
+      // Record other-platform versions (watchos/macOS/...) for multi-SDK queries.
+      // iOS `unavailable` is set only when the iOS seg itself says so.
+      const m = t.match(/^[A-Za-z]+\s+([0-9._]+)/);
+      if (m) notePlatform(pm[1], parseVersionToken(m[1]));
+      const gi = t.match(/introduced\s*:\s*([0-9._]+)/);
+      if (gi) notePlatform(pm[1], parseVersionToken(gi[1]));
+      continue;
+    }
     if (t === 'unavailable') { info.unavailable = true; continue; }
     if (t === 'deprecated') { info.deprecated = true; continue; }
 
@@ -135,6 +170,7 @@ export function parseSwiftAvailable(inner: string): AvailabilityInfo {
     if (m) {
       const v = parseVersionToken(m[1]);
       if (v !== null && v < info.introducedIn) info.introducedIn = v;
+      notePlatform('iOS', v);
       continue;
     }
     // "iOS, introduced: 13.0, deprecated: 16.0, obsoleted: 17.0, renamed: ..., ..."
@@ -145,6 +181,7 @@ export function parseSwiftAvailable(inner: string): AvailabilityInfo {
       if (gi) {
         const v = parseVersionToken(gi[1]);
         if (v !== null && v < info.introducedIn) info.introducedIn = v;
+        notePlatform('iOS', v);
       }
       const gd = pairs.match(/deprecated\s*:\s*([0-9._]+)/);
       if (gd) {
@@ -176,6 +213,7 @@ export function parseSwiftAvailable(inner: string): AvailabilityInfo {
     if (/\bunavailable\b/.test(t)) info.unavailable = true;
     if (/\bdeprecated\b/.test(t)) info.deprecated = true;
   }
+  fallbackIntroduced();
   return info;
 }
 
@@ -186,6 +224,15 @@ export function mergeAvailability(list: AvailabilityInfo[]): AvailabilityInfo {
   for (const a of list) {
     if (a.raw) raws.push(a.raw);
     if (a.introducedIn < out.introducedIn) out.introducedIn = a.introducedIn;
+    if (a.platforms) {
+      out.platforms = out.platforms ?? {};
+      for (const [k, v] of Object.entries(a.platforms)) {
+        if (v !== undefined) {
+          const cur = out.platforms[k];
+          if (cur === undefined || v < cur) out.platforms[k] = v;
+        }
+      }
+    }
     if (a.deprecatedIn !== null && out.deprecatedIn === null) out.deprecatedIn = a.deprecatedIn;
     if (a.obsoletedIn !== null && out.obsoletedIn === null) out.obsoletedIn = a.obsoletedIn;
     if (a.renamedTo && !out.renamedTo) out.renamedTo = a.renamedTo;
@@ -202,6 +249,10 @@ export function inheritAvail(
   own: AvailabilityInfo,
 ): AvailabilityInfo {
   const base = scope ?? unknownAvail();
+  const platforms = (() => {
+    if (!own.platforms && !base.platforms) return undefined;
+    return { ...(base.platforms ?? {}), ...(own.platforms ?? {}) };
+  })();
   return {
     raw: own.raw || base.raw,
     introducedIn: own.introducedIn !== UNKNOWN_VERSION ? own.introducedIn : base.introducedIn,
@@ -210,6 +261,7 @@ export function inheritAvail(
     renamedTo: own.renamedTo ?? base.renamedTo,
     unavailable: own.unavailable || base.unavailable,
     deprecated: own.deprecated || base.deprecated,
+    platforms,
   };
 }
 
@@ -426,7 +478,7 @@ export function parseSwiftInterface(
   content: string,
   framework: string,
   filePath: string,
-): ApiSymbol[] {
+): ParsedSymbol[] {
   const rawLines = content.split('\n');
 
   // Pass 1: join multi-line declarations (unbalanced parens), cap 8 lines.
@@ -449,7 +501,7 @@ export function parseSwiftInterface(
     }
   }
 
-  const symbols: ApiSymbol[] = [];
+  const symbols: ParsedSymbol[] = [];
   const stack: Scope[] = [];
   let pending: AvailabilityInfo[] = [];
   let depth = 0;
@@ -484,6 +536,7 @@ export function parseSwiftInterface(
       renamedTo: avail.renamedTo,
       unavailable: avail.unavailable,
       deprecated: avail.deprecated,
+      platforms: avail.platforms ? { ...avail.platforms } : undefined,
       parentType,
       filePath,
       lineNumber,
@@ -665,8 +718,26 @@ function foldObjCMacro(kind: string, args: string, avail: AvailabilityInfo): voi
   const minInto = (v: number) => {
     if (v < avail.introducedIn) avail.introducedIn = v;
   };
+  const notePlat = (p: string, v: number | null) => {
+    if (v === null) return;
+    const key =
+      p === 'ios' ? 'ios'
+      : p === 'watchos' ? 'watchos'
+      : p === 'macos' || p === 'maccatalyst' ? 'macos'
+      : p === 'tvos' ? 'tvos'
+      : p === 'visionos' || p === 'xros' ? 'xros'
+      : null;
+    if (!key) return;
+    avail.platforms = avail.platforms ?? {};
+    const cur = avail.platforms[key];
+    if (cur === undefined || v < cur) avail.platforms[key] = v;
+  };
   switch (kind) {
     case 'API_AVAILABLE': {
+      // Record every platform inside: ios(9.0), watchos(2.0), macos(...), ...
+      for (const m of args.matchAll(/(\w+)\s*\(\s*([0-9._]+)/g)) {
+        notePlat(m[1].toLowerCase(), parseVersionToken(m[2]));
+      }
       const m = args.match(/ios\s*\(\s*([0-9._]+)/i);
       if (m) {
         const v = parseVersionToken(m[1]);
@@ -712,7 +783,7 @@ function foldObjCMacro(kind: string, args: string, avail: AvailabilityInfo): voi
     }
     case 'NS_DEPRECATED_IOS': {
       // (iosIntroduced, iosDeprecated, ...)
-      if (nums[0] !== undefined) minInto(nums[0]);
+      if (nums[0] !== undefined) { minInto(nums[0]); notePlat('ios', nums[0]); }
       if (nums[1] !== undefined) avail.deprecatedIn = nums[1];
       avail.deprecated = true;
       break;
@@ -756,6 +827,14 @@ export function mergeObjCAvail(
 ): AvailabilityInfo {
   if (!pending || !pending.raw) return inline;
   if (!inline.raw) return pending;
+  const platforms: AvailabilityInfo['platforms'] = (() => {
+    if (!pending.platforms && !inline.platforms) return undefined;
+    const out: Record<string, number | undefined> = { ...(pending.platforms ?? {}) };
+    for (const [k, v] of Object.entries(inline.platforms ?? {})) {
+      if (v !== undefined && (out[k] === undefined || (v as number) < (out[k] as number))) out[k] = v;
+    }
+    return out;
+  })();
   return {
     raw: `${pending.raw} ${inline.raw}`,
     introducedIn: Math.min(pending.introducedIn, inline.introducedIn),
@@ -764,6 +843,7 @@ export function mergeObjCAvail(
     renamedTo: pending.renamedTo ?? inline.renamedTo,
     unavailable: pending.unavailable || inline.unavailable,
     deprecated: pending.deprecated || inline.deprecated,
+    platforms,
   };
 }
 
@@ -781,9 +861,9 @@ export function parseObjCHeader(
   content: string,
   framework: string,
   filePath: string,
-): ApiSymbol[] {
+): ParsedSymbol[] {
   const lines = content.split('\n');
-  const symbols: ApiSymbol[] = [];
+  const symbols: ParsedSymbol[] = [];
   let pendingDoc: string[] = [];
   let inBlockComment = false;
   let blockBuf: string[] = [];
@@ -831,6 +911,7 @@ export function parseObjCHeader(
       renamedTo: avail.renamedTo,
       unavailable: avail.unavailable,
       deprecated: avail.deprecated,
+      platforms: avail.platforms ? { ...avail.platforms } : undefined,
       parentType,
       docComment,
       filePath,

@@ -8,34 +8,50 @@ import type {
   DeprecatedApi,
   DocGuide,
   FrameworkInfo,
+  ParsedSymbol,
   SearchResult,
   TypeMember,
 } from './types.js';
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
-function rowToSymbol(r: unknown[]): ApiSymbol {
+/** SDK roots inside Xcode.app, in index order. */
+export const SDK_PATHS: Record<string, string> = {
+  ios: '/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk',
+  watchos: '/Applications/Xcode.app/Contents/Developer/Platforms/WatchOS.platform/Developer/SDKs/WatchOS.sdk',
+  macos: '/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk',
+  tvos: '/Applications/Xcode.app/Contents/Developer/Platforms/AppleTVOS.platform/Developer/SDKs/AppleTVOS.sdk',
+  xros: '/Applications/Xcode.app/Contents/Developer/Platforms/XROS.platform/Developer/SDKs/XROS.sdk',
+};
+
+function rowToSymbol(r: unknown[], cols: string[]): ApiSymbol {
+  const c: Record<string, unknown> = {};
+  cols.forEach((k, i) => (c[k] = r[i]));
+  const str = (v: unknown) => (v != null ? String(v) : undefined);
   return {
-    name: String(r[1]),
-    kind: r[2] as ApiSymbol['kind'],
-    framework: String(r[3]),
-    module: String(r[4]),
-    lang: (r[5] as string) === 'objc' ? 'objc' : 'swift',
-    signature: String(r[6]),
-    availability: String(r[7] ?? ''),
-    minIOSVersion: Number(r[8]),
-    introducedIn: Number(r[8]),
-    deprecatedIn: r[9] != null ? Number(r[9]) : null,
-    obsoletedIn: r[10] != null ? Number(r[10]) : null,
-    renamedTo: r[11] != null ? String(r[11]) : undefined,
-    unavailable: Number(r[12]) === 1,
-    deprecated: Number(r[13]) === 1,
-    parentType: r[14] != null ? String(r[14]) : undefined,
-    docComment: r[15] != null ? String(r[15]) : undefined,
-    filePath: String(r[16]),
-    lineNumber: Number(r[17]),
+    name: String(c['name']),
+    kind: c['kind'] as ApiSymbol['kind'],
+    framework: String(c['framework']),
+    module: String(c['module']),
+    lang: c['lang'] === 'objc' ? 'objc' : 'swift',
+    platform: (str(c['platform']) ?? 'ios') as ApiSymbol['platform'],
+    signature: String(c['signature']),
+    availability: String(c['availability'] ?? ''),
+    minIOSVersion: Number(c['introduced_in']),
+    introducedIn: Number(c['introduced_in']),
+    deprecatedIn: c['deprecated_in'] != null ? Number(c['deprecated_in']) : null,
+    obsoletedIn: c['obsoleted_in'] != null ? Number(c['obsoleted_in']) : null,
+    renamedTo: str(c['renamed_to']),
+    unavailable: Number(c['unavailable']) === 1,
+    deprecated: Number(c['deprecated']) === 1,
+    parentType: str(c['parent_type']),
+    docComment: str(c['doc_comment']),
+    filePath: String(c['file_path']),
+    lineNumber: Number(c['line_number']),
   };
 }
+const SYMBOL_COLS =
+  'id, name, kind, framework, module, lang, platform, signature, availability, introduced_in, deprecated_in, obsoleted_in, renamed_to, unavailable, deprecated, parent_type, doc_comment, file_path, line_number'.split(', ');
 
 function rowToSearch(r: unknown[]): SearchResult {
   return {
@@ -43,6 +59,9 @@ function rowToSearch(r: unknown[]): SearchResult {
     kind: String(r[1]),
     framework: String(r[2]),
     lang: String(r[9] ?? ''),
+    platforms: String(r[10] ?? '')
+      .split(',')
+      .filter(Boolean) as SearchResult['platforms'],
     parentType: r[3] != null ? String(r[3]) : undefined,
     signature: String(r[4]),
     availability: String(r[5] ?? ''),
@@ -50,6 +69,12 @@ function rowToSearch(r: unknown[]): SearchResult {
     deprecatedIn: r[7] != null ? Number(r[7]) : null,
     renamedTo: r[8] != null ? String(r[8]) : undefined,
   };
+}
+
+/** Extra WHERE fragment for platform filter. */
+function platformFilter(platform?: string): { sql: string; params: (string | number)[] } {
+  if (!platform) return { sql: '', params: [] };
+  return { sql: ` AND platform = ?`, params: [platform] };
 }
 
 export class SdkIndexer {
@@ -102,6 +127,7 @@ export class SdkIndexer {
         framework TEXT NOT NULL,
         module TEXT NOT NULL,
         lang TEXT NOT NULL DEFAULT 'swift',
+        platform TEXT NOT NULL DEFAULT 'ios',
         signature TEXT NOT NULL,
         availability TEXT,
         introduced_in INTEGER DEFAULT 999999,
@@ -118,6 +144,7 @@ export class SdkIndexer {
     `);
     this.db.run(`CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols(name)`);
     this.db.run(`CREATE INDEX IF NOT EXISTS idx_symbols_framework ON symbols(framework)`);
+    this.db.run(`CREATE INDEX IF NOT EXISTS idx_symbols_platform ON symbols(platform)`);
     this.db.run(`CREATE INDEX IF NOT EXISTS idx_symbols_kind ON symbols(kind)`);
     this.db.run(`CREATE INDEX IF NOT EXISTS idx_symbols_introduced ON symbols(introduced_in)`);
     this.db.run(`CREATE INDEX IF NOT EXISTS idx_symbols_parent ON symbols(parent_type)`);
@@ -150,11 +177,15 @@ export class SdkIndexer {
     return String(r[0].values[0][0]);
   }
 
-  buildIndex(sdkPath: string) {
+  /**
+   * Index one SDK (single platform). Call once per platform via buildAll().
+   * Dedupes identical (platform, file, line) rows so rebuilds are idempotent.
+   */
+  buildIndex(sdkPath: string, platform: ApiSymbol['platform'] = 'ios'): number {
     const frameworksDir = path.join(sdkPath, 'System/Library/Frameworks');
     if (!fs.existsSync(frameworksDir)) {
       console.error(`Frameworks dir not found: ${frameworksDir}`);
-      return;
+      return 0;
     }
 
     const frameworks = fs.readdirSync(frameworksDir).filter((f) => f.endsWith('.framework'));
@@ -164,13 +195,16 @@ export class SdkIndexer {
       const fwName = fwDir.replace('.framework', '');
       const fwPath = path.join(frameworksDir, fwDir);
 
-      // Swift interfaces
+      // Swift interfaces (all arch slices)
       const modulesDir = path.join(fwPath, 'Modules', `${fwName}.swiftmodule`);
       if (fs.existsSync(modulesDir)) {
         const files = fs.readdirSync(modulesDir).filter((f) => f.endsWith('.swiftinterface'));
         for (const file of files) {
           const content = fs.readFileSync(path.join(modulesDir, file), 'utf-8');
-          totalSymbols += this.insertAll(parseSwiftInterface(content, fwName, path.join(modulesDir, file)));
+          totalSymbols += this.insertAll(
+            parseSwiftInterface(content, fwName, path.join(modulesDir, file)),
+            platform,
+          );
         }
       }
 
@@ -180,7 +214,10 @@ export class SdkIndexer {
         const headers = fs.readdirSync(headersDir).filter((f) => f.endsWith('.h'));
         for (const header of headers) {
           const content = fs.readFileSync(path.join(headersDir, header), 'utf-8');
-          totalSymbols += this.insertAll(parseObjCHeader(content, fwName, path.join(headersDir, header)));
+          totalSymbols += this.insertAll(
+            parseObjCHeader(content, fwName, path.join(headersDir, header)),
+            platform,
+          );
         }
       }
     }
@@ -189,29 +226,57 @@ export class SdkIndexer {
       const settings = JSON.parse(
         fs.readFileSync(path.join(sdkPath, 'SDKSettings.json'), 'utf-8'),
       ) as { Version?: string; CanonicalName?: string };
-      this.setMeta('sdk_version', settings.CanonicalName ?? settings.Version ?? 'unknown');
+      this.setMeta(`sdk_version_${platform}`, settings.CanonicalName ?? settings.Version ?? 'unknown');
     } catch {
-      this.setMeta('sdk_version', 'unknown');
+      this.setMeta(`sdk_version_${platform}`, 'unknown');
     }
     this.setMeta('built_at', new Date().toISOString());
-    console.error(`Indexed ${totalSymbols} symbols across ${frameworks.length} frameworks`);
+    console.error(`[${platform}] Indexed ${totalSymbols} symbols across ${frameworks.length} frameworks`);
+    return totalSymbols;
   }
 
-  private insertAll(symbols: ApiSymbol[]): number {
+  /** Index every platform SDK found in Xcode (ios/watchos/macos/tvos/xros). */
+  buildAll(platforms?: ApiSymbol['platform'][]): number {
+    const wanted = platforms ?? (Object.keys(SDK_PATHS) as ApiSymbol['platform'][]);
+    let total = 0;
+    for (const p of wanted) {
+      const sdk = SDK_PATHS[p];
+      if (!sdk || !fs.existsSync(sdk)) {
+        console.error(`[${p}] SDK not found, skipped`);
+        continue;
+      }
+      total += this.buildIndex(sdk, p);
+    }
+    return total;
+  }
+
+  private insertAll(symbols: ParsedSymbol[], platform: ApiSymbol['platform']): number {
     for (const sym of symbols) {
+      // Merge parsed per-platform versions (@available watchOS x.y / API_AVAILABLE
+      // watchos(...)) into the raw availability string so cross-SDK queries work
+      // even before other SDKs are indexed.
+      let availability = sym.availability;
+      if (sym.platforms) {
+        const extras = Object.entries(sym.platforms)
+          .filter((e): e is [string, number] => typeof e[1] === 'number' && (e[1] as number) !== UNKNOWN_VERSION)
+          .map(([k, v]) => `${k}${Math.floor(v / 10000)}.${Math.floor((v % 10000) / 100)}`)
+          .filter((s) => !availability.includes(s));
+        if (extras.length > 0) availability = `${availability} [also: ${extras.join(', ')}]`;
+      }
       this.db.run(
-        `INSERT INTO symbols (name, kind, framework, module, lang, signature, availability,
+        `INSERT INTO symbols (name, kind, framework, module, lang, platform, signature, availability,
           introduced_in, deprecated_in, obsoleted_in, renamed_to, unavailable, deprecated,
           parent_type, doc_comment, file_path, line_number)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           sym.name,
           sym.kind,
           sym.framework,
           sym.module,
           sym.lang,
+          platform,
           sym.signature,
-          sym.availability,
+          availability,
           sym.introducedIn,
           sym.deprecatedIn,
           sym.obsoletedIn,
@@ -252,13 +317,19 @@ export class SdkIndexer {
     return this.loadDocsFromMarkdown(fs.readFileSync(filePath, 'utf-8'), path.basename(filePath));
   }
 
-  listFrameworks(): FrameworkInfo[] {
-    const results = this.db.exec(`
-      SELECT framework, COUNT(*) as api_count, MIN(introduced_in) as min_version
+  listFrameworks(platform?: string): FrameworkInfo[] {
+    const pf = platformFilter(platform);
+    const results = this.db.exec(
+      `
+      SELECT framework, COUNT(*) as api_count, MIN(introduced_in) as min_version,
+             GROUP_CONCAT(DISTINCT platform) as platforms
       FROM symbols
+      WHERE 1 = 1${pf.sql}
       GROUP BY framework
       ORDER BY api_count DESC
-    `);
+    `,
+      pf.params,
+    );
     if (results.length === 0) return [];
     return results[0].values.map((r) => ({
       name: String(r[0]),
@@ -266,6 +337,7 @@ export class SdkIndexer {
       apiCount: Number(r[1]),
       minIOSVersion: Number(r[2]),
       isNew: Number(r[2]) >= 260000,
+      platforms: String(r[3] ?? '').split(',').filter(Boolean) as FrameworkInfo['platforms'],
     }));
   }
 
@@ -279,12 +351,16 @@ export class SdkIndexer {
     iosVersion?: number,
     kind?: string,
     limit = 50,
+    platform?: string,
   ): SearchResult[] {
     const like = `%${query}%`;
     const prefix = `${query}%`;
+    // Dedup across platforms: one row per (name, kind, framework), with
+    // platforms aggregated. The best (lowest introduced) row wins ranking.
     let sql = `
       SELECT name, kind, framework, parent_type, signature, availability,
-             introduced_in, deprecated_in, renamed_to, lang
+             introduced_in, deprecated_in, renamed_to, lang,
+             GROUP_CONCAT(DISTINCT platform) as platforms
       FROM symbols
       WHERE (name LIKE ? OR signature LIKE ? OR parent_type LIKE ?)`;
     const params: (string | number)[] = [like, like, like];
@@ -297,12 +373,17 @@ export class SdkIndexer {
       sql += ` AND kind = ?`;
       params.push(kind);
     }
+    if (platform) {
+      sql += ` AND platform = ?`;
+      params.push(platform);
+    }
     if (iosVersion) {
       sql += ` AND (introduced_in <= ? OR introduced_in = ${UNKNOWN_VERSION})`;
       params.push(iosVersion);
     }
 
-    sql += ` ORDER BY CASE WHEN name = ? THEN 0 WHEN name LIKE ? THEN 1 ELSE 2 END,
+    sql += ` GROUP BY name, kind, framework
+              ORDER BY CASE WHEN name = ? THEN 0 WHEN name LIKE ? THEN 1 ELSE 2 END,
               introduced_in DESC, name LIMIT ?`;
     params.push(query, prefix, Math.min(limit, 200));
     const results = this.db.exec(sql, params);
@@ -318,12 +399,21 @@ export class SdkIndexer {
     return `kind != 'extension'${includeInternal ? '' : ` AND name NOT LIKE '\\_%' ESCAPE '\\'`}`;
   }
 
-  getDetail(name: string, framework?: string, includeInternal = false): ApiDetail | null {
-    let sql = `SELECT * FROM symbols WHERE name = ?`;
-    const params: string[] = [name];
+  getDetail(
+    name: string,
+    framework?: string,
+    includeInternal = false,
+    platform?: string,
+  ): ApiDetail | null {
+    let sql = `SELECT ${SYMBOL_COLS.join(', ')} FROM symbols WHERE name = ?`;
+    const params: (string | number)[] = [name];
     if (framework) {
       sql += ` AND framework = ?`;
       params.push(framework);
+    }
+    if (platform) {
+      sql += ` AND platform = ?`;
+      params.push(platform);
     }
     sql += ` ORDER BY ${SdkIndexer.RANK} LIMIT 1`;
     let results = this.db.exec(sql, params);
@@ -331,15 +421,18 @@ export class SdkIndexer {
       // Without framework: contains fallback. With framework: no fallback —
       // a contains match (e.g. 'View' -> '_PreviewHost') misleads more than null.
       if (framework) return null;
-      const params2: string[] = [`%${name}%`, name];
-      results = this.db.exec(
-        `SELECT * FROM symbols WHERE name LIKE ?
-         ORDER BY CASE WHEN name = ? THEN 0 ELSE 1 END, ${SdkIndexer.RANK} LIMIT 1`,
-        params2,
-      );
+      const params2: (string | number)[] = [`%${name}%`];
+      let sql2 = `SELECT ${SYMBOL_COLS.join(', ')} FROM symbols WHERE name LIKE ?`;
+      if (platform) {
+        sql2 += ` AND platform = ?`;
+        params2.push(platform);
+      }
+      sql2 += ` ORDER BY CASE WHEN name = ? THEN 0 ELSE 1 END, ${SdkIndexer.RANK} LIMIT 1`;
+      params2.push(name);
+      results = this.db.exec(sql2, params2);
     }
     if (results.length === 0 || results[0].values.length === 0) return null;
-    const sym = rowToSymbol(results[0].values[0]);
+    const sym = rowToSymbol(results[0].values[0], SYMBOL_COLS);
     // Compact top-20 member summaries so the agent knows what to explore next.
     // Full list lives behind get_type_members.
     const filter = this.memberFilter(includeInternal);
@@ -347,10 +440,10 @@ export class SdkIndexer {
     const mrows = this.db.exec(
       `SELECT name, kind, signature, availability, introduced_in, deprecated_in, renamed_to
        FROM symbols
-       WHERE ${filter} AND framework = ?
+       WHERE ${filter} AND framework = ? AND platform = ?
          AND (parent_type = ? OR parent_type = ? OR parent_type LIKE ?)
        ORDER BY kind, name LIMIT 20`,
-      [sym.framework, sym.name, short, `%.${short}`],
+      [sym.framework, sym.platform, sym.name, short, `%.${short}`],
     );
     // Resolve semantic parent version first: for extension rows the type decl
     // (class/struct/enum/protocol, else the extension itself) defines inheritance.
@@ -359,10 +452,10 @@ export class SdkIndexer {
     if (sym.kind === 'extension' && sym.parentType) {
       const trows = this.db.exec(
         `SELECT availability, introduced_in FROM symbols
-         WHERE kind != 'extension' AND framework = ?
+         WHERE kind != 'extension' AND framework = ? AND platform = ?
            AND (name = ? OR name LIKE ?)
          ORDER BY ${SdkIndexer.RANK} LIMIT 1`,
-        [sym.framework, sym.parentType, `%.${sym.parentType}`],
+        [sym.framework, sym.platform, sym.parentType, `%.${sym.parentType}`],
       );
       if (trows.length > 0 && trows[0].values.length > 0) {
         parentAvail = String(trows[0].values[0][0] ?? '');
@@ -384,9 +477,9 @@ export class SdkIndexer {
       }));
     const cnt = this.db.exec(
       `SELECT COUNT(*) FROM symbols
-       WHERE ${filter} AND framework = ?
+       WHERE ${filter} AND framework = ? AND platform = ?
          AND (parent_type = ? OR parent_type = ? OR parent_type LIKE ?)`,
-      [sym.framework, sym.name, short, `%.${short}`],
+      [sym.framework, sym.platform, sym.name, short, `%.${short}`],
     );
     const detail: ApiDetail = {
       ...sym,
@@ -396,7 +489,7 @@ export class SdkIndexer {
     if (sym.renamedTo) {
       // Resolve target but strip its members (avoid recursive bloat);
       // memberCount tells the agent whether the target is worth opening.
-      const target = this.getDetail(sym.renamedTo, sym.framework);
+      const target = this.getDetail(sym.renamedTo, sym.framework, includeInternal, sym.platform);
       if (target) {
         const { members: _drop, renamedToDetail: _drop2, ...targetBase } = target;
         detail.renamedToDetail = { ...targetBase, memberCount: target.memberCount };
@@ -418,6 +511,7 @@ export class SdkIndexer {
     framework?: string,
     limit = 200,
     includeInternal = false,
+    platform?: string,
   ): TypeMember[] {
     const short = typeName.includes('.') ? typeName.split('.').pop()! : typeName;
     let sql = `
@@ -431,6 +525,10 @@ export class SdkIndexer {
     if (framework) {
       sql += ` AND framework = ?`;
       params.push(framework);
+    }
+    if (platform) {
+      sql += ` AND platform = ?`;
+      params.push(platform);
     }
     sql += ` ORDER BY kind, name LIMIT ?`;
     params.push(Math.min(limit, 500));
@@ -449,28 +547,33 @@ export class SdkIndexer {
     }));
   }
 
-  getNewApis(iosVersion: number, framework?: string): SearchResult[] {
+  getNewApis(iosVersion: number, framework?: string, platform?: string): SearchResult[] {
     let sql = `
       SELECT name, kind, framework, parent_type, signature, availability,
-             introduced_in, deprecated_in, renamed_to, lang
+             introduced_in, deprecated_in, renamed_to, lang,
+             GROUP_CONCAT(DISTINCT platform) as platforms
       FROM symbols WHERE introduced_in = ?`;
     const params: (string | number)[] = [iosVersion];
     if (framework) {
       sql += ` AND framework = ?`;
       params.push(framework);
     }
-    sql += ` ORDER BY framework, name LIMIT 200`;
+    if (platform) {
+      sql += ` AND platform = ?`;
+      params.push(platform);
+    }
+    sql += ` GROUP BY name, kind, framework ORDER BY framework, name LIMIT 200`;
     const results = this.db.exec(sql, params);
     if (results.length === 0) return [];
     return results[0].values.map(rowToSearch);
   }
 
   /** Deprecated / obsoleted / unavailable APIs — with renamed_to for migration. */
-  getDeprecated(iosVersion: number, framework?: string): DeprecatedApi[] {
+  getDeprecated(iosVersion: number, framework?: string, platform?: string): DeprecatedApi[] {
     let sql = `
       SELECT name, kind, framework, parent_type, signature, availability,
-             introduced_in, deprecated_in, renamed_to, lang, unavailable, obsoleted_in
-      FROM symbols
+             introduced_in, deprecated_in, renamed_to, lang, platforms, unavailable, obsoleted_in
+      FROM (SELECT *, GROUP_CONCAT(DISTINCT platform) as platforms FROM symbols GROUP BY name, kind, framework) s
       WHERE ((deprecated_in IS NOT NULL AND deprecated_in <= ?)
          OR (obsoleted_in IS NOT NULL AND obsoleted_in <= ?)
          OR unavailable = 1)`;
@@ -479,13 +582,17 @@ export class SdkIndexer {
       sql += ` AND framework = ?`;
       params.push(framework);
     }
+    if (platform) {
+      sql += ` AND platforms LIKE ?`;
+      params.push(`%${platform}%`);
+    }
     sql += ` ORDER BY framework, name LIMIT 200`;
     const results = this.db.exec(sql, params);
     if (results.length === 0) return [];
     return results[0].values.map((r) => ({
       ...rowToSearch(r),
-      unavailable: Number(r[10]) === 1,
-      obsoletedIn: r[11] != null ? Number(r[11]) : null,
+      unavailable: Number(r[11]) === 1,
+      obsoletedIn: r[12] != null ? Number(r[12]) : null,
     }));
   }
 
@@ -516,6 +623,9 @@ export class SdkIndexer {
     const byLang = this.db.exec(
       'SELECT lang, COUNT(*) as c FROM symbols GROUP BY lang',
     );
+    const byPlatform = this.db.exec(
+      'SELECT platform, COUNT(*) as c FROM symbols GROUP BY platform ORDER BY c DESC',
+    );
     const versioned = this.db.exec(
       `SELECT COUNT(*) FROM symbols WHERE introduced_in != ${UNKNOWN_VERSION}`,
     );
@@ -526,15 +636,22 @@ export class SdkIndexer {
       "SELECT COUNT(*) FROM symbols WHERE doc_comment IS NOT NULL AND doc_comment != ''",
     );
     const docsCount = this.db.exec('SELECT COUNT(*) FROM docs');
-    const sdkVersion = this.getMeta('sdk_version');
+    const sdkVersions = this.db.exec(`SELECT k, v FROM meta WHERE k LIKE 'sdk_version_%'`);
     const totalN = Number(total[0]?.values[0]?.[0] ?? 0);
     const versionedN = Number(versioned[0]?.values[0]?.[0] ?? 0);
     return {
       totalSymbols: totalN,
       totalFrameworks: frameworks[0]?.values[0]?.[0] ?? 0,
-      sdkVersion,
+      sdkVersion: this.getMeta('sdk_version'),
+      sdkVersions: Object.fromEntries(
+        (sdkVersions.length === 0 ? [] : sdkVersions[0].values).map((r) => [
+          String(r[0]).replace('sdk_version_', ''),
+          String(r[1]),
+        ]),
+      ),
       symbolsByKind: byKind.length === 0 ? [] : byKind[0].values.map((r) => ({ kind: String(r[0]), count: Number(r[1]) })),
       symbolsByLang: byLang.length === 0 ? [] : byLang[0].values.map((r) => ({ lang: String(r[0]), count: Number(r[1]) })),
+      symbolsByPlatform: byPlatform.length === 0 ? [] : byPlatform[0].values.map((r) => ({ platform: String(r[0]), count: Number(r[1]) })),
       versionCoverage: totalN > 0 ? Math.round((versionedN / totalN) * 1000) / 10 : 0,
       deprecatedCount: deprecated[0]?.values[0]?.[0] ?? 0,
       symbolsWithDocs: withDocs[0]?.values[0]?.[0] ?? 0,

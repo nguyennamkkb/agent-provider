@@ -5,6 +5,17 @@ export type ApiKind =
 
 export type ApiLang = 'swift' | 'objc';
 
+/** SDK platform: ios | watchos | macos | tvos | xros (visionOS). */
+export type SdkPlatform = 'ios' | 'watchos' | 'macos' | 'tvos' | 'xros';
+
+/**
+ * Parser output. `platform` (which SDK row came from) is assigned at index
+ * time; `platforms` (per-platform versions parsed from @available) at parse time.
+ */
+export interface ParsedSymbol extends Omit<ApiSymbol, 'platform' | 'platforms'> {
+  platforms?: Partial<Record<SdkPlatform, number>>;
+}
+
 export interface ApiSymbol {
   name: string;
   kind: ApiKind;
@@ -12,6 +23,8 @@ export interface ApiSymbol {
   module: string;
   /** 'swift' | 'objc' */
   lang: ApiLang;
+  /** Which SDK this row was indexed from. Same API can appear on many platforms. */
+  platform: SdkPlatform;
   signature: string;
   /** Raw availability text (compat): joined @available(...) / ObjC macros */
   availability: string;
@@ -36,6 +49,8 @@ export interface FrameworkInfo {
   apiCount: number;
   minIOSVersion: number;
   isNew: boolean;
+  /** Platforms whose SDK contains this framework (deduped). */
+  platforms: SdkPlatform[];
 }
 
 export interface SearchResult {
@@ -43,6 +58,8 @@ export interface SearchResult {
   kind: string;
   framework: string;
   lang?: string;
+  /** Platforms where this API exists (deduped across SDKs). */
+  platforms?: SdkPlatform[];
   parentType?: string;
   signature: string;
   availability: string;

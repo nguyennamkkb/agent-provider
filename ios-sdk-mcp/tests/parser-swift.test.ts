@@ -23,6 +23,19 @@ describe('parseSwiftAvailable', () => {
   it('family 1: platform versions', () => {
     const a = parseSwiftAvailable('iOS 18.0, macOS 15.0, tvOS 18.0, watchOS 11.0, visionOS 2.0, *');
     expect(a.introducedIn).toBe(180000); // iOS, not min across platforms
+    expect(a.platforms).toMatchObject({ ios: 180000, macos: 150000, tvos: 180000, watchos: 110000, xros: 20000 });
+  });
+  it('watchOS-only: platforms recorded + fallback introduced', () => {
+    const a = parseSwiftAvailable('watchOS 9.0, *');
+    expect(a.platforms).toMatchObject({ watchos: 90000 });
+    expect(a.introducedIn).toBe(90000);
+    expect(a.unavailable).toBe(false);
+  });
+  it('API_AVAILABLE multi-platform (ObjC)', () => {
+    const s = objc(`@interface S : NSObject\n@property (nonatomic, readonly) NSProgress *p API_AVAILABLE(ios(12.0), watchos(5.0));\n@end`);
+    const p = s.find((x) => x.name === 'p')!;
+    expect(p.introducedIn).toBe(120000);
+    expect(p.platforms).toMatchObject({ ios: 120000, watchos: 50000 });
   });
   it('family 2: introduced/deprecated/renamed', () => {
     const a = parseSwiftAvailable('iOS, introduced: 13.0, deprecated: 16.0, renamed: "foo(_:)"');

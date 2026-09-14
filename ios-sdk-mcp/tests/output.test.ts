@@ -80,7 +80,7 @@ describe('output: get_api_detail contract', () => {
   it('detail top-level keys đúng schema, không phình', () => {
     const d = indexer.getDetail('Card', 'OutFW')!;
     const allowed = new Set([
-      'name', 'kind', 'framework', 'module', 'lang', 'signature', 'availability',
+      'name', 'kind', 'framework', 'module', 'lang', 'platform', 'signature', 'availability',
       'minIOSVersion', 'introducedIn', 'deprecatedIn', 'obsoletedIn', 'renamedTo',
       'unavailable', 'deprecated', 'parentType', 'docComment', 'filePath',
       'lineNumber', 'members', 'memberCount', 'renamedToDetail',
