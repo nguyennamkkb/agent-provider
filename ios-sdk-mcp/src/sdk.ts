@@ -170,6 +170,39 @@ export function tokenize(query: string): string[] {
   return query.toLowerCase().split(/[^a-z0-9_]+/).filter((t) => t.length >= 2);
 }
 
+/** Chuẩn hóa version number -> "13.0" (130000 -> "13.0", 999999 -> null). */
+export function formatVersion(v: number | null | undefined): string | null {
+  if (v === null || v === undefined || v >= 999999) return null;
+  return `${Math.floor(v / 10000)}.${Math.floor((v % 10000) / 100)}`;
+}
+
+/**
+ * Rút gọn chuỗi @available thô: gộp các dòng cùng platform (giữ dòng đầu),
+ * bỏ sentinel deprecated 100000.0. VD 2 dòng iOS 16 + iOS 13 -> giữ 1.
+ * Trả { text, introducedIn, deprecatedIn, renamedTo, unavailable } để convert
+ * không phải parse lại.
+ */
+export function compactAvailability(
+  availLines: string[],
+  parsed: { introducedIn: number; deprecatedIn: number | null; renamedTo?: string; unavailable: boolean },
+): string | undefined {
+  if (availLines.length === 0) return undefined;
+  if (availLines.length === 1) return availLines[0];
+  const seen = new Set<string>();
+  const kept: string[] = [];
+  for (const l of availLines) {
+    // key = platform đầu dòng (@available(iOS ... / API_AVAILABLE(ios...)...)
+    const m = l.match(/^@(\w+)\((\w+)/) || l.match(/\b(API_\w+|NS_\w+)\b/);
+    const key = m ? m[0].toLowerCase() : l.slice(0, 24).toLowerCase();
+    // Giữ dòng đầu mỗi key; dòng sau cùng key mà ngắn hơn thì bỏ.
+    if (seen.has(key)) continue;
+    seen.add(key);
+    kept.push(l);
+  }
+  // Bỏ sentinel trong text (deprecated: 100000.0 -> deprecated: —).
+  return kept.map((l) => l.replace(/,?\s*deprecated:\s*100000\.0/g, '')).join('; ');
+}
+
 // --- đọc source + giải tích phía trên ---------------------------------------
 
 const linesCache = new Map<string, string[]>();
@@ -204,70 +237,82 @@ export interface ContextAnalysis {
 }
 
 /**
- * Giải tích phía trên 1 dòng decl: gom @available lines + standalone ObjC
- * macros + doc comment. Chạy 2 phase đúng semantics parser:
- * - Phase 1: đi ngược qua scope chain (giống scope stack của parser): member
- *   không @available riêng -> thừa hưởng @available của `extension`/type chứa
- *   nó. Xuyên qua @_originallyDefinedIn / #if / dòng trống / `}` đóng.
- * - Phase 2: doc comment liền kề phía trên decl (dừng ở dòng trống/code).
- * Áp đúng luật merge của parser (mergeAvailability).
+ * Tìm dòng mở scope chứa 1 dòng decl (đi ngược + brace counting): struct/class/
+ * enum/extension/@interface/@protocol gần nhất mà block của nó chứa decl.
+ * Trả index 0-based của opener, hoặc -1.
  */
-export function analyzeContext(filePath: string, lineNumber: number, maxLookback = 60): ContextAnalysis {
-  const lines = fileLines(filePath);
-  const availLines: string[] = [];
-
-  // Phase 1: scope chain — đi ngược tìm @available của scope chứa decl.
-  // Thuật toán (giống parser scope stack, chạy ngược): brace depth tương đối
-  // so với decl. Cùng level (depth 0) = @available của chính decl. Khi gặp
-  // dòng mở scope (extension/type/@interface...) mà depth < 0, ta vừa thoát
-  // scope con -> reset depth về (depth+opens-closes của dòng opener) rồi gom
-  // tiếp @available phía trên opener (inheritance).
+export function findScopeOpener(lines: string[], lineNumber: number, maxLookback = 400): number {
   let depth = 0;
-  let collecting = true;
-  for (let i = lineNumber - 2; i >= Math.max(0, lineNumber - 2 - maxLookback); i--) {
-    const raw = lines[i] ?? '';
-    const t = raw.trim();
-    if (!t || t.startsWith('#')) continue; // xuyên qua trống + preprocessor
-    if (t.startsWith('@_originallyDefinedIn')) continue; // move-marker, xuyên qua
+  for (let i = lineNumber - 1; i >= Math.max(0, lineNumber - maxLookback); i--) {
+    const t = (lines[i] ?? '').trim();
     const noStr = t.replace(/"(?:[^"\\]|\\.)*"/g, '""');
-    const opens = (noStr.match(/\{/g) || []).length;
-    const closes = (noStr.match(/\}/g) || []).length;
-    const isAvail = t.startsWith('@available') ||
-      /\b(API_AVAILABLE|API_DEPRECATED|API_DEPRECATED_WITH_REPLACEMENT|API_UNAVAILABLE|NS_AVAILABLE|NS_DEPRECATED|NS_CLASS_AVAILABLE)\b/.test(t);
-    if (isAvail) {
-      if (!collecting) continue; // @available của scope con đã đóng -> bỏ
-      availLines.unshift(t);
+    depth += (noStr.match(/\}/g) || []).length - (noStr.match(/\{/g) || []).length;
+    if (depth < 0) {
+      // depth âm KHÔNG đồng nghĩa opener: VD `}` ở 1448 đóng getter của member
+      // TRƯỚC (environment), không phải mở scope chứa decl.
+      // Chỉ nhận opener khi: extension/@interface/@protocol, hoặc dòng mở type
+      // (struct/class/enum...), hoặc dòng có `{` mở scope mà KHÔNG phải dòng
+      // member `public var/func... {` (getter block — opener thật nằm trên nữa).
+      const isExtLike = /(^|[\s*])(extension|@interface|@protocol)\b/.test(t);
+      const isTypeOpen = /^\s*(public|open|package)\s+(class|struct|enum|protocol|actor)\b/.test(t);
+      const hasBrace = /\{\s*$/.test(noStr);
+      const isMemberWithBody = /^\s*(public|open|package)\b.*\b(var|func|init|subscript|let)\b.*\{\s*$/.test(t);
+      if (isExtLike || isTypeOpen) return i;
+      if (hasBrace && !isMemberWithBody) return i;
+      // `}` lẻ hoặc member có body (getter): đây là scope con đã đóng —
+      // cân bằng lại (dòng này +1 opener ảo) rồi đi tiếp lên.
+      depth = 0;
       continue;
     }
-    // Dòng code: cập nhật depth ngược (đi lên: `}` = vào scope con đã đóng).
-    depth += closes - opens;
-    if (depth < 0) {
-      // Vừa thoát 1 scope con: nếu dòng này là opener (extension/type/...)
-      // thì đó chính là scope chứa decl -> tiếp tục gom phía trên nó.
-      // Nếu không phải opener (member khác) -> dừng.
-      const isOpener = /(^|[\s*])(extension|@interface|@protocol)\b/.test(t) ||
-        /^\s*(public|open|package)\b.*\{\s*$/.test(raw) ||
-        /^\s*(public|open|package)\s+(class|struct|enum|protocol|actor)\b/.test(t);
-      if (isOpener) {
-        depth = 0; // vào scope cha, gom tiếp
-        continue;
-      }
-      break;
+    if (depth === 0 && /(^|[\s*])(extension|@interface|@protocol)\b/.test(t)) return i;
+  }
+  return -1;
+}
+
+/** Dòng có phải availability/macro marker không (cả Swift + ObjC). */
+function isAvailLine(t: string): boolean {
+  return t.startsWith('@available') ||
+    /\b(API_AVAILABLE|API_DEPRECATED|API_DEPRECATED_WITH_REPLACEMENT|API_UNAVAILABLE|NS_AVAILABLE|NS_DEPRECATED|NS_CLASS_AVAILABLE)\b/.test(t);
+}
+
+/** Gom @available lines kề ngay trên 1 dòng (dừng ở trống/code khác). */
+function collectOwnAvail(lines: string[], lineNumber: number): string[] {
+  const out: string[] = [];
+  for (let i = lineNumber - 2; i >= Math.max(0, lineNumber - 17); i--) {
+    const t = (lines[i] ?? '').trim();
+    if (!t) break;
+    if (t.startsWith('#') || t.startsWith('@_originallyDefinedIn')) continue;
+    if (isAvailLine(t)) {
+      out.unshift(t);
+      continue;
     }
-    if (depth === 0) {
-      // Cùng level: decl khác (kể cả `}` đóng scope trước) -> dừng gom avail.
-      // Ngoại lệ: dòng `{`-only/`}`-only đã xử lý ở depth; comment bỏ qua ở phase 2.
-      if (/^(\}|\{)\s*$/.test(t)) continue;
-      collecting = false;
-      // Vẫn đi tiếp để tìm opener scope cha? Không — depth 0 + decl khác =
-      // đã hết block của decl. Dừng hẳn để tránh leo nhầm.
-      if (/^\s*(@|[a-zA-Z])/.test(t) && !t.startsWith('//') && !t.startsWith('/*') && !t.startsWith('*')) {
-        // Cho phép đi tiếp qua comment-only lines (phase 2 lo doc), dừng ở code.
-        if (!/^[A-Za-z@#]/.test(t)) continue;
-        break;
-      }
+    break;
+  }
+  return out;
+}
+
+/**
+ * Giải tích phía trên 1 dòng decl: gom @available lines + standalone ObjC
+ * macros + doc comment. Đúng semantics parser scope stack:
+ * - own @available kề trên decl (dừng ở trống/code).
+ * - + @available phía trên scope opener chứa decl (inheritance).
+ * Xuyên @_originallyDefinedIn / #if. Áp luật merge của parser.
+ */
+export function analyzeContext(filePath: string, lineNumber: number, _maxLookback = 60): ContextAnalysis {
+  const lines = fileLines(filePath);
+  // Phase 1a: own.
+  const availLines = collectOwnAvail(lines, lineNumber);
+  // Phase 1b: scope opener -> gom phía trên nó (inheritance).
+  // Member KHÔNG own @available (thường gặp: var/func trong struct/extension)
+  // thì lấy của scope. Member CÓ own thì chỉ merge thêm khi opener là
+  // extension KHÁC scope hiện tại? Không — đơn giản + đúng parser: merge luôn
+  // (mergeAvailability lấy min/intro theo iOS, union deprecated/renamed).
+  const openerIdx = findScopeOpener(lines, lineNumber);
+  if (openerIdx >= 0) {
+    const above = collectOwnAvail(lines, openerIdx + 1);
+    for (const l of above) {
+      if (!availLines.includes(l)) availLines.unshift(l);
     }
-    // depth > 0: đang trong scope con đã đóng -> bỏ qua tới khi cân bằng.
   }
 
   // Phase 2: doc comment liền kề (parser takeDoc semantics).

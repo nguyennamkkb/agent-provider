@@ -10,6 +10,7 @@ import {
 import {
   discoverFiles,
   analyzeContext,
+  compactAvailability,
   tokenize,
   type SdkFile,
 } from './sdk.js';
@@ -58,12 +59,15 @@ export function convertLine(
     if (/^(internal|fileprivate|private)\b/.test(noAttr)) return null;
     const ext = noAttr.match(/^extension\s+([^\s{]+)/);
     const ctx = analyzeContext(file.path, lineNumber);
+    const availText = (extra?: { introducedIn: number; deprecatedIn: number | null; renamedTo?: string; unavailable: boolean }) =>
+      compactAvailability(ctx.availLines, extra ?? { introducedIn: ctx.introducedIn ?? 999999, deprecatedIn: ctx.deprecatedIn, renamedTo: ctx.renamedTo, unavailable: ctx.unavailable });
     if (ext) {
       const name = cleanTypeName(ext[1]);
+      const av = availText();
       return {
         name, kind: 'extension', framework: file.framework, lang: 'swift',
         platform: file.platform, signature: cutSignature(lineText),
-        ...(ctx.availLines.length > 0 ? { availability: ctx.availLines.join('; ') } : {}),
+        ...(av ? { availability: av } : {}),
         ...(ctx.introducedIn !== null ? { introducedIn: ctx.introducedIn } : {}),
         ...(ctx.deprecatedIn !== null ? { deprecatedIn: ctx.deprecatedIn } : {}),
         ...(ctx.renamedTo ? { renamedTo: ctx.renamedTo } : {}),
@@ -87,18 +91,20 @@ export function convertLine(
       // enum case không prefix
       const cm = noAttr.match(/^case\s+(\w+)/);
       if (!cm) return null;
+      const av = availText();
       return {
         name: cm[1], kind: 'case', framework: file.framework, lang: 'swift',
         platform: file.platform, signature: cutSignature(lineText),
-        ...(ctx.availLines.length > 0 ? { availability: ctx.availLines.join('; ') } : {}),
+        ...(av ? { availability: av } : {}),
         ...(ctx.introducedIn !== null ? { introducedIn: ctx.introducedIn } : {}),
         filePath: file.path, lineNumber,
       };
     }
+    const av = availText();
     return {
       name: decl.names[0], kind: decl.kind, framework: file.framework, lang: 'swift',
       platform: file.platform, signature: cutSignature(lineText),
-      ...(ctx.availLines.length > 0 ? { availability: ctx.availLines.join('; ') } : {}),
+      ...(av ? { availability: av } : {}),
       ...(ctx.introducedIn !== null ? { introducedIn: ctx.introducedIn } : {}),
       ...(ctx.deprecatedIn !== null ? { deprecatedIn: ctx.deprecatedIn } : {}),
       ...(ctx.renamedTo ? { renamedTo: ctx.renamedTo } : {}),

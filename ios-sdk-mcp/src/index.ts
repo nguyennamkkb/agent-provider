@@ -81,8 +81,9 @@ function filesByPath(files: SdkFile[]): Map<string, SdkFile> {
   return new Map(files.map((f) => [f.path, f]));
 }
 
-/** Đọc members trong block scope chứa 1 decl (scope-aware, không đoán theo tên). */
-async function readScopeMembers(
+/** Đọc members trong block scope chứa 1 decl (scope-aware, không đoán theo tên).
+ * Export để get_type_members dùng chung (không lặp logic). */
+export async function readScopeMembers(
   top: ConvertedHit,
   includeInternal: boolean,
 ): Promise<ConvertedHit[]> {
@@ -124,8 +125,9 @@ async function readScopeMembers(
   const map = top.lang === 'objc' ? objcMapFor(file) : undefined;
   const out: ConvertedHit[] = [];
   // Quét từ dòng sau decl (type) / sau opener (extension) tới `}` cân bằng.
-  // Đếm brace từ dòng decl của type: `struct X ... {` -> d=1, member ở d>=1,
-  // `}` về 0 = hết scope. Getter/setter lồng (d=2) bỏ qua (không phải member).
+  // d = số scope đang mở (decl `struct X {` -> d=1). Convert dòng ở d==1 TRƯỚC
+  // khi cộng brace của chính nó — nếu không, dòng `public var axes {` vừa khai
+  // báo member vừa đẩy d lên 2 sẽ bị bỏ qua nhầm. `get`/`set` ở d==2 thì skip.
   let d = 0;
   if (isTypeDecl) {
     const declNoStr = ((lines[top.lineNumber - 1] ?? '').trim()).replace(/"(?:[^"\\]|\\.)*"/g, '""');
@@ -137,13 +139,25 @@ async function readScopeMembers(
     const raw = lines[i] ?? '';
     const t = raw.trim();
     const noStr = t.replace(/"(?:[^"\\]|\\.)*"/g, '""');
+    // Chỉ convert khi đang ở scope trực tiếp (d==1). Ngoài scope lồng
+    // (getter/setter/closure, d>=2): cập nhật depth, bỏ qua.
+    // Đóng scope type (d<=0): break. Convert TRƯỚC khi cộng brace của dòng
+    // hiện tại — nếu không, dòng `public var axes {` vừa khai member vừa đẩy
+    // d lên 2 sẽ bị skip nhầm.
+    const atDirect = isType ? d === 1 : true;
+    if (!t) {
+      if (isType) d += (noStr.match(/\{/g) || []).length - (noStr.match(/\}/g) || []).length;
+      continue;
+    }
+    if (/^(get|set|willSet|didSet)\b/.test(t)) {
+      if (isType) d += (noStr.match(/\{/g) || []).length - (noStr.match(/\}/g) || []).length;
+      continue;
+    }
+    const hit = atDirect ? convertLine(file, i + 1, raw, map) : null;
     if (isType) {
       d += (noStr.match(/\{/g) || []).length - (noStr.match(/\}/g) || []).length;
-      if (d <= 0) break; // `}` đóng scope type
-      if (d > 1) continue; // getter/setter/closure lồng — không phải member trực tiếp
+      if (d <= 0) break;
     }
-    if (!t) continue;
-    const hit = convertLine(file, i + 1, raw, map);
     if (!hit) continue;
     if (hit.kind === 'extension') continue;
     if (!includeInternal && hit.name.startsWith('_')) continue;
@@ -155,7 +169,7 @@ async function readScopeMembers(
     if (inScope) {
       if (hit.name === top.name && hit.kind === top.kind) continue;
       out.push(hit);
-    } else if (isType && top.lang === 'swift' && d === 1 && ['func', 'var', 'init', 'operator', 'typealias', 'associatedtype', 'macro', 'case'].includes(hit.kind)) {
+    } else if (isType && top.lang === 'swift' && ['func', 'var', 'init', 'operator', 'typealias', 'associatedtype', 'macro', 'case'].includes(hit.kind)) {
       // Dòng public trong block type nhưng convert chưa gắn parent (hiếm): gắn tay.
       out.push({ ...hit, parentType: top.name });
     }
@@ -284,11 +298,29 @@ server.tool(
   async ({ name, framework, include_internal, platform }) => {
     const files = filesFor(framework, platform);
     const short = name.includes('.') ? name.split('.').pop()! : name;
-    const matches = await rgMatches(short, files, 400);
+    // Tìm type decl trước để lấy đúng file chứa nó (tránh rg 400 dòng rác từ
+    // các file khác rồi lọc parentType — convertLine không gắn parent cho
+    // member (chỉ parser full-file mới biết scope), nên lọc parentType rỗng).
+    const declMatches = await rgMatches(short, files, 60);
     const byPath = filesByPath(files);
-    let members = toHits(matches, byPath, 400).filter(
-      (h) => h.parentType === name || h.parentType === short || h.parentType?.endsWith(`.${short}`),
+    const decls = toHits(declMatches, byPath, 60).filter(
+      (h) => h.name === short || h.name === name || h.name.endsWith(`.${short}`),
     );
+    const typeDecl = rankHits(decls, short).find((h) =>
+      ['struct', 'class', 'enum', 'protocol'].includes(h.kind),
+    ) ?? rankHits(decls, short)[0];
+    let members: ConvertedHit[] = [];
+    if (typeDecl) {
+      members = await readScopeMembers(typeDecl, include_internal ?? false);
+    }
+    if (members.length === 0) {
+      // Fallback cũ: rg theo tên + lọc parentType (cho ObjC @interface scope
+      // mà convertLine đã gắn parent qua objcLineMap).
+      const matches = await rgMatches(short, files, 400);
+      members = toHits(matches, byPath, 400).filter(
+        (h) => h.parentType === name || h.parentType === short || h.parentType?.endsWith(`.${short}`),
+      );
+    }
     members = members
       .filter((h) => (include_internal ? true : !h.name.startsWith('_')))
       .filter((h) => h.kind !== 'extension');

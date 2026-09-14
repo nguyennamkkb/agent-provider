@@ -138,6 +138,21 @@ describeRg('direct: ObjC (ARSession, UIScrollView doc)', () => {
     const ctx = analyzeContext(h.file, h.lineNumber);
     expect(ctx.introducedIn).toBe(110000);
   }, 15000);
+  it('member kế thừa scope: axes/showsIndicators intro iOS 13 (không own @available)', async () => {
+    const fw = iosFiles.filter((f) => f.framework === 'SwiftUI' && f.lang === 'swift' && (f as SdkFile).platform === 'ios');
+    const hits = await rgMatches('public struct ScrollView<Content>', fw);
+    // axes nằm trong struct ScrollView (iOS 13 scope), không có @available riêng.
+    const { fileLines, findScopeOpener } = await import('../src/sdk.js');
+    const lines = fileLines(hits[0].file);
+    // tìm dòng axes trong struct này
+    const { rgMatches: rg2 } = await import('../src/sdk.js');
+    const ax = await rg2('public var axes: SwiftUICore.Axis.Set', fw, 5);
+    const inScroll = ax.find((h) => h.file === hits[0].file && h.lineNumber > hits[0].lineNumber && h.lineNumber < hits[0].lineNumber + 25);
+    expect(inScroll).toBeDefined();
+    const ctx = analyzeContext(inScroll!.file, inScroll!.lineNumber);
+    expect(ctx.introducedIn).toBe(130000);
+    expect(findScopeOpener(lines, inScroll!.lineNumber)).toBeGreaterThanOrEqual(0);
+  }, 15000);
   it('UIScrollView: @interface match đúng dòng (không nhầm @protocol forward)', async () => {
     const fw = iosFiles.filter((f) => f.framework === 'UIKit' && f.path.endsWith('UIScrollView.h'));
     expect(fw.length).toBe(1);

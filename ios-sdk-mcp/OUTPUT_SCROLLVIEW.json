@@ -1,0 +1,316 @@
+{
+  "requests": [
+    {
+      "id": 2,
+      "tool": "search_apis",
+      "args": {
+        "query": "ScrollView",
+        "framework": "SwiftUI",
+        "limit": 8
+      }
+    },
+    {
+      "id": 3,
+      "tool": "get_api_detail",
+      "args": {
+        "name": "ScrollView",
+        "framework": "SwiftUI",
+        "platform": "ios"
+      }
+    },
+    {
+      "id": 4,
+      "tool": "get_type_members",
+      "args": {
+        "name": "ScrollView",
+        "framework": "SwiftUI",
+        "platform": "ios"
+      }
+    },
+    {
+      "id": 5,
+      "tool": "read_source",
+      "args": {
+        "line": 14871,
+        "before": 2,
+        "after": 6
+      }
+    }
+  ],
+  "outputs": {
+    "5": "14869: }\n14870: @available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)\n14871: public struct ScrollView<Content> : SwiftUICore.View where Content : SwiftUICore.View {\n14872:   public var content: Content\n14873:   public var axes: SwiftUICore.Axis.Set {\n14874:     get\n14875:     set\n14876:   }",
+    "4": [
+      {
+        "name": "content",
+        "kind": "var",
+        "framework": "SwiftUI",
+        "lang": "swift",
+        "platform": "ios",
+        "signature": "public var content: Content",
+        "availability": "@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)",
+        "introducedIn": 130000,
+        "filePath": "$SDK/iPhoneOS.sdk/SwiftUI.framework/Modules/SwiftUI.swiftmodule/arm64e-apple-ios.swiftinterface",
+        "lineNumber": 14872,
+        "parentType": "ScrollView"
+      },
+      {
+        "name": "axes",
+        "kind": "var",
+        "framework": "SwiftUI",
+        "lang": "swift",
+        "platform": "ios",
+        "signature": "public var axes: SwiftUICore.Axis.Set",
+        "availability": "@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)",
+        "introducedIn": 130000,
+        "filePath": "$SDK/iPhoneOS.sdk/SwiftUI.framework/Modules/SwiftUI.swiftmodule/arm64e-apple-ios.swiftinterface",
+        "lineNumber": 14873,
+        "parentType": "ScrollView"
+      },
+      {
+        "name": "showsIndicators",
+        "kind": "var",
+        "framework": "SwiftUI",
+        "lang": "swift",
+        "platform": "ios",
+        "signature": "public var showsIndicators: Swift.Bool",
+        "availability": "@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)",
+        "introducedIn": 130000,
+        "filePath": "$SDK/iPhoneOS.sdk/SwiftUI.framework/Modules/SwiftUI.swiftmodule/arm64e-apple-ios.swiftinterface",
+        "lineNumber": 14877,
+        "parentType": "ScrollView"
+      },
+      {
+        "name": "body",
+        "kind": "var",
+        "framework": "SwiftUI",
+        "lang": "swift",
+        "platform": "ios",
+        "signature": "@_Concurrency.MainActor @preconcurrency public var body: some SwiftUICore.View",
+        "filePath": "$SDK/iPhoneOS.sdk/SwiftUI.framework/Modules/SwiftUI.swiftmodule/arm64e-apple-ios.swiftinterface",
+        "lineNumber": 14886,
+        "parentType": "ScrollView"
+      },
+      {
+        "name": "Body",
+        "kind": "typealias",
+        "framework": "SwiftUI",
+        "lang": "swift",
+        "platform": "ios",
+        "signature": "public typealias Body = @_opaqueReturnTypeOf(\"$s7SwiftUI10ScrollViewV4bodyQrvp\", 0) __<Content>",
+        "availability": "@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)",
+        "introducedIn": 130000,
+        "filePath": "$SDK/iPhoneOS.sdk/SwiftUI.framework/Modules/SwiftUI.swiftmodule/arm64e-apple-ios.swiftinterface",
+        "lineNumber": 14890,
+        "parentType": "ScrollView"
+      },
+      {
+        "name": "init",
+        "kind": "init",
+        "framework": "SwiftUI",
+        "lang": "swift",
+        "platform": "ios",
+        "signature": "public init(_ axes: SwiftUICore.Axis.Set = .vertical, showsIndicators: Swift.Bool = true, @SwiftUICore.ViewBuilder content: () -> Content)",
+        "availability": "@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *); @available(macOS, introduced: 10.15, message: \"Use the ScrollView(_:content:) initializer and the scrollIndicators(:_) modifier\"); @available(tvOS, introduced: 13.0, message: \"Use the ScrollView(_:content:) initializer and the scrollIndicators(:_) modifier\"); @available(watchOS, introduced: 6.0, message: \"Use the ScrollView(_:content:) initializer and the scrollIndicators(:_) modifier\")",
+        "introducedIn": 130000,
+        "filePath": "$SDK/iPhoneOS.sdk/SwiftUI.framework/Modules/SwiftUI.swiftmodule/arm64e-apple-ios.swiftinterface",
+        "lineNumber": 14885,
+        "parentType": "ScrollView"
+      }
+    ],
+    "3": {
+      "name": "ScrollView",
+      "kind": "struct",
+      "framework": "SwiftUI",
+      "lang": "swift",
+      "platform": "ios",
+      "signature": "public struct ScrollView<Content> : SwiftUICore.View where Content : SwiftUICore.View",
+      "availability": "@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)",
+      "introducedIn": 130000,
+      "filePath": "$SDK/iPhoneOS.sdk/SwiftUI.framework/Modules/SwiftUI.swiftmodule/arm64e-apple-ios.swiftinterface",
+      "lineNumber": 14871,
+      "members": [
+        {
+          "name": "content",
+          "kind": "var",
+          "framework": "SwiftUI",
+          "lang": "swift",
+          "platform": "ios",
+          "signature": "public var content: Content",
+          "availability": "@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)",
+          "introducedIn": 130000,
+          "filePath": "$SDK/iPhoneOS.sdk/SwiftUI.framework/Modules/SwiftUI.swiftmodule/arm64e-apple-ios.swiftinterface",
+          "lineNumber": 14872,
+          "parentType": "ScrollView"
+        },
+        {
+          "name": "axes",
+          "kind": "var",
+          "framework": "SwiftUI",
+          "lang": "swift",
+          "platform": "ios",
+          "signature": "public var axes: SwiftUICore.Axis.Set",
+          "availability": "@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)",
+          "introducedIn": 130000,
+          "filePath": "$SDK/iPhoneOS.sdk/SwiftUI.framework/Modules/SwiftUI.swiftmodule/arm64e-apple-ios.swiftinterface",
+          "lineNumber": 14873,
+          "parentType": "ScrollView"
+        },
+        {
+          "name": "showsIndicators",
+          "kind": "var",
+          "framework": "SwiftUI",
+          "lang": "swift",
+          "platform": "ios",
+          "signature": "public var showsIndicators: Swift.Bool",
+          "availability": "@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)",
+          "introducedIn": 130000,
+          "filePath": "$SDK/iPhoneOS.sdk/SwiftUI.framework/Modules/SwiftUI.swiftmodule/arm64e-apple-ios.swiftinterface",
+          "lineNumber": 14877,
+          "parentType": "ScrollView"
+        },
+        {
+          "name": "init",
+          "kind": "init",
+          "framework": "SwiftUI",
+          "lang": "swift",
+          "platform": "ios",
+          "signature": "public init(_ axes: SwiftUICore.Axis.Set = .vertical, showsIndicators: Swift.Bool = true, @SwiftUICore.ViewBuilder content: () -> Content)",
+          "availability": "@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *); @available(macOS, introduced: 10.15, message: \"Use the ScrollView(_:content:) initializer and the scrollIndicators(:_) modifier\"); @available(tvOS, introduced: 13.0, message: \"Use the ScrollView(_:content:) initializer and the scrollIndicators(:_) modifier\"); @available(watchOS, introduced: 6.0, message: \"Use the ScrollView(_:content:) initializer and the scrollIndicators(:_) modifier\")",
+          "introducedIn": 130000,
+          "filePath": "$SDK/iPhoneOS.sdk/SwiftUI.framework/Modules/SwiftUI.swiftmodule/arm64e-apple-ios.swiftinterface",
+          "lineNumber": 14885,
+          "parentType": "ScrollView"
+        },
+        {
+          "name": "body",
+          "kind": "var",
+          "framework": "SwiftUI",
+          "lang": "swift",
+          "platform": "ios",
+          "signature": "@_Concurrency.MainActor @preconcurrency public var body: some SwiftUICore.View",
+          "filePath": "$SDK/iPhoneOS.sdk/SwiftUI.framework/Modules/SwiftUI.swiftmodule/arm64e-apple-ios.swiftinterface",
+          "lineNumber": 14886,
+          "parentType": "ScrollView"
+        },
+        {
+          "name": "Body",
+          "kind": "typealias",
+          "framework": "SwiftUI",
+          "lang": "swift",
+          "platform": "ios",
+          "signature": "public typealias Body = @_opaqueReturnTypeOf(\"$s7SwiftUI10ScrollViewV4bodyQrvp\", 0) __<Content>",
+          "availability": "@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)",
+          "introducedIn": 130000,
+          "filePath": "$SDK/iPhoneOS.sdk/SwiftUI.framework/Modules/SwiftUI.swiftmodule/arm64e-apple-ios.swiftinterface",
+          "lineNumber": 14890,
+          "parentType": "ScrollView"
+        }
+      ],
+      "memberCount": 6
+    },
+    "2": [
+      {
+        "name": "ScrollView",
+        "kind": "struct",
+        "framework": "SwiftUI",
+        "lang": "swift",
+        "platform": "ios",
+        "signature": "public struct ScrollView<Content> : SwiftUICore.View where Content : SwiftUICore.View",
+        "availability": "@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)",
+        "introducedIn": 130000,
+        "filePath": "$SDK/iPhoneOS.sdk/SwiftUI.framework/Modules/SwiftUI.swiftmodule/arm64e-apple-ios.swiftinterface",
+        "lineNumber": 14871
+      },
+      {
+        "name": "scrollViewConfig",
+        "kind": "var",
+        "framework": "SwiftUI",
+        "lang": "swift",
+        "platform": "ios",
+        "signature": "public var scrollViewConfig: SwiftUI._ScrollViewConfig",
+        "availability": "@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)",
+        "introducedIn": 130000,
+        "filePath": "$SDK/iPhoneOS.sdk/SwiftUI.framework/Modules/SwiftUI.swiftmodule/arm64e-apple-ios.swiftinterface",
+        "lineNumber": 11625
+      },
+      {
+        "name": "SwiftUI._ScrollViewRoot",
+        "kind": "extension",
+        "framework": "SwiftUI",
+        "lang": "swift",
+        "platform": "ios",
+        "signature": "extension SwiftUI._ScrollViewRoot : Swift.Sendable",
+        "availability": "@available(*, unavailable)",
+        "unavailable": true,
+        "parentType": "SwiftUI._ScrollViewRoot",
+        "filePath": "$SDK/iPhoneOS.sdk/SwiftUI.framework/Modules/SwiftUI.swiftmodule/arm64e-apple-ios.swiftinterface",
+        "lineNumber": 3163
+      },
+      {
+        "name": "SwiftUI._ScrollViewGestureProvider",
+        "kind": "extension",
+        "framework": "SwiftUI",
+        "lang": "swift",
+        "platform": "ios",
+        "signature": "extension SwiftUI._ScrollViewGestureProvider",
+        "availability": "@available(iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0, *)",
+        "introducedIn": 130000,
+        "parentType": "SwiftUI._ScrollViewGestureProvider",
+        "filePath": "$SDK/iPhoneOS.sdk/SwiftUI.framework/Modules/SwiftUI.swiftmodule/arm64e-apple-ios.swiftinterface",
+        "lineNumber": 11470
+      },
+      {
+        "name": "SwiftUI._ScrollViewConfig.ContentOffset",
+        "kind": "extension",
+        "framework": "SwiftUI",
+        "lang": "swift",
+        "platform": "ios",
+        "signature": "extension SwiftUI._ScrollViewConfig.ContentOffset : Swift.Sendable",
+        "availability": "@available(*, unavailable)",
+        "unavailable": true,
+        "parentType": "SwiftUI._ScrollViewConfig.ContentOffset",
+        "filePath": "$SDK/iPhoneOS.sdk/SwiftUI.framework/Modules/SwiftUI.swiftmodule/arm64e-apple-ios.swiftinterface",
+        "lineNumber": 11498
+      },
+      {
+        "name": "SwiftUI._ScrollViewConfig",
+        "kind": "extension",
+        "framework": "SwiftUI",
+        "lang": "swift",
+        "platform": "ios",
+        "signature": "extension SwiftUI._ScrollViewConfig : Swift.Sendable",
+        "availability": "@available(*, unavailable)",
+        "unavailable": true,
+        "parentType": "SwiftUI._ScrollViewConfig",
+        "filePath": "$SDK/iPhoneOS.sdk/SwiftUI.framework/Modules/SwiftUI.swiftmodule/arm64e-apple-ios.swiftinterface",
+        "lineNumber": 11501
+      },
+      {
+        "name": "SwiftUI._ScrollView.Main",
+        "kind": "extension",
+        "framework": "SwiftUI",
+        "lang": "swift",
+        "platform": "ios",
+        "signature": "extension SwiftUI._ScrollView.Main : Swift.Sendable",
+        "availability": "@available(*, unavailable)",
+        "unavailable": true,
+        "parentType": "SwiftUI._ScrollView.Main",
+        "filePath": "$SDK/iPhoneOS.sdk/SwiftUI.framework/Modules/SwiftUI.swiftmodule/arm64e-apple-ios.swiftinterface",
+        "lineNumber": 11519
+      },
+      {
+        "name": "SwiftUI._ScrollView",
+        "kind": "extension",
+        "framework": "SwiftUI",
+        "lang": "swift",
+        "platform": "ios",
+        "signature": "extension SwiftUI._ScrollView : Swift.Sendable",
+        "availability": "@available(*, unavailable)",
+        "unavailable": true,
+        "parentType": "SwiftUI._ScrollView",
+        "filePath": "$SDK/iPhoneOS.sdk/SwiftUI.framework/Modules/SwiftUI.swiftmodule/arm64e-apple-ios.swiftinterface",
+        "lineNumber": 11522
+      }
+    ]
+  }
+}
