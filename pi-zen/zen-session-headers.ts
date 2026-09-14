@@ -95,6 +95,43 @@ export default function (pi: ExtensionAPI) {
     event.headers["x-opencode-request"] = newRequestId();
   });
 
+  // Zen (qua MiniMax Console) thi thoảng từ chối replay reasoning cũ:
+  // "reasoning `encrypted_content` was not issued to this caller".
+  // Pi replay nguyên xi reasoning các turn trước (kèm encrypted_content),
+  // mà blob này gắn với backend đã cấp nó — Zen route sang backend khác
+  // là request 400, dù cùng history retry lại có khi pass (nondeterministic).
+  // Thực nghiệm: strip reasoning history thì êm được ~30 turn rồi vẫn gãy,
+  // vì request giữa turn còn replay reasoning VỪA MỚI SINH của chính turn đó
+  // mà Zen vẫn route lệch backend. Nên bỏ TOÀN BỘ reasoning items khỏi
+  // payload (history + trong turn). Giữ nguyên function_call/output/text
+  // nên tool chain không gãy — chỉ mất chain-of-thought cũ, model reason
+  // lại mỗi bước. Reasoning vốn optional với Responses API.
+  // Đảm bảo: không còn encrypted_content nào rời máy mình => lỗi này
+  // không thể xảy ra nữa (đổi lại chất lượng suy luận đa-turn giảm nhẹ).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (pi as any).on("before_provider_request", (event: any, ctx: any) => {
+    if (!isZenProvider(ctx)) return undefined;
+    const body = event?.payload;
+    if (!body || typeof body !== "object" || !Array.isArray(body.input)) {
+      return undefined;
+    }
+    const input = body.input as unknown[];
+    let dropped = 0;
+    const kept = input.filter((it) => {
+      if (
+        typeof it === "object" &&
+        it !== null &&
+        (it as Record<string, unknown>).type === "reasoning"
+      ) {
+        dropped++;
+        return false;
+      }
+      return true;
+    });
+    if (!dropped) return undefined;
+    return { ...body, input: kept };
+  });
+
   pi.registerCommand("zen-session", {
     description: "Xem OpenCode session id đang dùng cho provider Zen",
     handler: async (_args, ctx) => {

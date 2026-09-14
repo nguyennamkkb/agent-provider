@@ -67,6 +67,8 @@ pi-zen/
 
 Extension nhận diện provider Zen qua `baseUrl` chứa `opencode.ai/zen` (fallback tên `zen-*`/`op-zen-*`), gắn `User-Agent: opencode/...` + `x-opencode-session`/`x-opencode-request` (mô phỏng ID OpenCode), giữ 1 session id cho cả conversation. Lệnh `/zen-session` trong Pi để xem session id hiện tại. File này bắt buộc là TypeScript theo API extension của Pi, không gộp vào `zen` được.
 
+Extension còn strip toàn bộ `reasoning` items khỏi payload Responses gửi Zen (hook `before_provider_request`): Zen thỉnh thoảng từ chối replay reasoning cũ với lỗi `encrypted_content was not issued to this caller` do blob gắn với backend đã cấp nó mà Zen route lệch. Bỏ reasoning khỏi wire (giữ nguyên function_call/output/text) thì lỗi này không thể xảy ra; đổi lại model mất chain-of-thought cũ và reason lại mỗi bước.
+
 ## Yêu cầu
 
 - `python3` (tương thích 3.9+), `pi` đã cài.
