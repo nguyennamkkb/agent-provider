@@ -25,6 +25,21 @@ describe('parseSwiftAvailable', () => {
     expect(a.introducedIn).toBe(180000); // iOS, not min across platforms
     expect(a.platforms).toMatchObject({ ios: 180000, macos: 150000, tvos: 180000, watchos: 110000, xros: 20000 });
   });
+  it('multi-line @available: introducedIn = iOS version, khong min cross-platform', () => {
+    // foregroundColor that: 5 dong iOS13/macOS10.15/tvOS13/watchOS6/visionOS1.0
+    // introducedIn phai la 130000 (iOS), khong phai 10000 (visionOS 1.0).
+    const m = mergeAvailability([
+      parseSwiftAvailable('iOS, introduced: 13.0, deprecated: 100000.0, renamed: "foregroundStyle(_:)"'),
+      parseSwiftAvailable('macOS, introduced: 10.15, deprecated: 100000.0, renamed: "foregroundStyle(_:)"'),
+      parseSwiftAvailable('tvOS, introduced: 13.0, deprecated: 100000.0, renamed: "foregroundStyle(_:)"'),
+      parseSwiftAvailable('watchOS, introduced: 6.0, deprecated: 100000.0, renamed: "foregroundStyle(_:)"'),
+      parseSwiftAvailable('visionOS, introduced: 1.0, deprecated: 100000.0, renamed: "foregroundStyle(_:)"'),
+    ]);
+    expect(m.introducedIn).toBe(130000);
+    expect(m.platforms).toMatchObject({ ios: 130000, macos: 101500, tvos: 130000, watchos: 60000, xros: 10000 });
+    expect(m.renamedTo).toBe('foregroundStyle(_:)');
+    expect(m.deprecatedIn).toBeNull(); // sentinel 100000.0 bi loai
+  });
   it('watchOS-only: platforms recorded + fallback introduced', () => {
     const a = parseSwiftAvailable('watchOS 9.0, *');
     expect(a.platforms).toMatchObject({ watchos: 90000 });
@@ -187,6 +202,15 @@ describe('swift: @available edge cases', () => {
   it('@available sharing line with attribute', () => {
     const s = swift(`@_hasMissingDesignatedInitializers @available(iOS 26.0, macOS 26.0, visionOS 26.0, *)\n@available(tvOS, unavailable)\n@available(watchOS, unavailable)\nfinal public class LanguageModelSession {`);
     expect(s[0]).toMatchObject({ name: 'LanguageModelSession', kind: 'class', introducedIn: 260000, unavailable: false });
+  });
+  it('@_originallyDefinedIn does not poison following @available', () => {
+    // SDK that: marker di chuyen module dung truoc @available that.
+    // Marker phai bi ignore (va khong xoa pending cua chinh block hien tai).
+    const s = swift(`@available(iOS 13.0, *)\n@_originallyDefinedIn(module: "SwiftUI", iOS 18.0)\n@available(iOS, introduced: 13.0, deprecated: 26.0, message: "Use X")\nextension T {\npublic static func + (lhs: T, rhs: T) -> T\n}`);
+    const ext = s.find((x) => x.kind === 'extension')!;
+    expect(ext.introducedIn).toBe(130000);
+    expect(ext.deprecatedIn).toBe(260000);
+    expect(s.find((x) => x.name === '+')).toMatchObject({ introducedIn: 130000, deprecatedIn: 260000 });
   });
   it('other-platform unavailable ignored', () => {
     const a = parseSwiftAvailable('tvOS, unavailable');

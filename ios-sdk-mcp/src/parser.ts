@@ -217,13 +217,15 @@ export function parseSwiftAvailable(inner: string): AvailabilityInfo {
   return info;
 }
 
-/** Merge several consecutive @available lines (one per platform). */
+/** Merge several consecutive @available lines (one per platform).
+ * introducedIn = version iOS (khong lay min cross-platform: visionOS 1.0 hay
+ * watchOS 6.0 khong phai version iOS). Neu khong co seg iOS thi fallback min
+ * platforms (API watchOS-only van co version nghia). */
 export function mergeAvailability(list: AvailabilityInfo[]): AvailabilityInfo {
   const out = unknownAvail();
   const raws: string[] = [];
   for (const a of list) {
     if (a.raw) raws.push(a.raw);
-    if (a.introducedIn < out.introducedIn) out.introducedIn = a.introducedIn;
     if (a.platforms) {
       out.platforms = out.platforms ?? {};
       for (const [k, v] of Object.entries(a.platforms)) {
@@ -240,6 +242,14 @@ export function mergeAvailability(list: AvailabilityInfo[]): AvailabilityInfo {
     out.deprecated = out.deprecated || a.deprecated;
   }
   out.raw = raws.join('; ');
+  // introducedIn = iOS version neu co; khong thi fallback min platforms.
+  const iosV = out.platforms?.ios;
+  if (iosV !== undefined) {
+    out.introducedIn = iosV;
+  } else if (out.platforms) {
+    const vs = Object.values(out.platforms).filter((v): v is number => typeof v === 'number');
+    if (vs.length > 0) out.introducedIn = Math.min(...vs);
+  }
   return out;
 }
 
@@ -253,9 +263,18 @@ export function inheritAvail(
     if (!own.platforms && !base.platforms) return undefined;
     return { ...(base.platforms ?? {}), ...(own.platforms ?? {}) };
   })();
+  // introducedIn = iOS version: own neu co, khong thi scope, khong thi platforms.ios.
+  const introducedIn =
+    own.introducedIn !== UNKNOWN_VERSION ? own.introducedIn
+    : base.introducedIn !== UNKNOWN_VERSION ? base.introducedIn
+    : (platforms?.ios ?? (() => {
+        if (!platforms) return UNKNOWN_VERSION;
+        const vs = Object.values(platforms).filter((v): v is number => typeof v === 'number');
+        return vs.length > 0 ? Math.min(...vs) : UNKNOWN_VERSION;
+      })());
   return {
     raw: own.raw || base.raw,
-    introducedIn: own.introducedIn !== UNKNOWN_VERSION ? own.introducedIn : base.introducedIn,
+    introducedIn,
     deprecatedIn: own.deprecatedIn ?? base.deprecatedIn,
     obsoletedIn: own.obsoletedIn ?? base.obsoletedIn,
     renamedTo: own.renamedTo ?? base.renamedTo,
@@ -554,6 +573,16 @@ export function parseSwiftInterface(
       continue; // blank lines / imports keep pending availability
     }
 
+    // @_originallyDefinedIn(module: "SwiftUI", iOS 18.0) is only a move-history
+    // marker, not availability: skip the line but KEEP pending @available
+    // (markers sit between @available lines and their extension: 112x View,
+    // 20x Text... all followed by `extension`, never by a type decl).
+    if (line.startsWith('@_originallyDefinedIn')) {
+      depth += opens - closes;
+      popScopes();
+      continue;
+    }
+
     // @available on its own line, or trailing other attributes
     // (e.g. `@_hasMissingDesignatedInitializers @available(iOS 26.0, ...)`).
     if (line.includes('@available')) {
@@ -584,7 +613,9 @@ export function parseSwiftInterface(
 
     const stripped = stripLeadingAttributes(line);
 
-    // extension Scope (availability on this line applies to all members inside)
+    // extension Scope: @available lines ABOVE the extension apply to all members
+    // inside. Trailing same-line attributes are NOT availability (available data
+    // precedes the keyword). Members inherit via scope stack (see inheritAvail).
     const ext = stripped.match(/^extension\s+([^\s{]+)/);
     if (ext) {
       const avail = inheritAvail(
@@ -835,9 +866,20 @@ export function mergeObjCAvail(
     }
     return out;
   })();
+  // introducedIn = iOS version (khong min cross-platform); fallback min neu khong co iOS.
+  const iosV = platforms?.ios;
+  let introducedIn: number;
+  if (iosV !== undefined) {
+    introducedIn = iosV;
+  } else if (platforms) {
+    const vs = Object.values(platforms).filter((v): v is number => typeof v === 'number');
+    introducedIn = vs.length > 0 ? Math.min(...vs) : Math.min(pending.introducedIn, inline.introducedIn);
+  } else {
+    introducedIn = Math.min(pending.introducedIn, inline.introducedIn);
+  }
   return {
     raw: `${pending.raw} ${inline.raw}`,
-    introducedIn: Math.min(pending.introducedIn, inline.introducedIn),
+    introducedIn,
     deprecatedIn: pending.deprecatedIn ?? inline.deprecatedIn,
     obsoletedIn: pending.obsoletedIn ?? inline.obsoletedIn,
     renamedTo: pending.renamedTo ?? inline.renamedTo,
