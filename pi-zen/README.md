@@ -23,11 +23,15 @@ Tùy chọn: `--bin-dir DIR`, `--no-bin`, `--with-ext`, `--uninstall`.
 
 ## Cách dùng
 
+`zen` chính là `install.py` sau khi cài (lệnh `install` tạo symlink `~/.local/bin/zen` → `install.py`). Chưa cài thì thay `zen ...` bằng `python3 install.py ...` (hoặc `./install.py ...`) — tác dụng như nhau.
+
 ```bash
 zen add <provider-id> <api-key> [--default]
 zen sync [--provider <id>] [--key <key>] [--dry-run]
 zen install [--bin-dir DIR] [--no-bin] [--with-ext] [--uninstall]
 zen doctor
+# tương đương khi chưa cài zen vào PATH:
+python3 install.py add <provider-id> <api-key> --default
 ```
 
 | Lệnh | Tác dụng |
@@ -68,6 +72,20 @@ pi-zen/
 Extension nhận diện provider Zen qua `baseUrl` chứa `opencode.ai/zen` (fallback tên `zen-*`/`op-zen-*`), gắn `User-Agent: opencode/...` + `x-opencode-session`/`x-opencode-request` (mô phỏng ID OpenCode), giữ 1 session id cho cả conversation. Lệnh `/zen-session` trong Pi để xem session id hiện tại. File này bắt buộc là TypeScript theo API extension của Pi, không gộp vào `zen` được.
 
 Extension còn strip toàn bộ `reasoning` items khỏi payload Responses gửi Zen (hook `before_provider_request`): Zen thỉnh thoảng từ chối replay reasoning cũ với lỗi `encrypted_content was not issued to this caller` do blob gắn với backend đã cấp nó mà Zen route lệch. Bỏ reasoning khỏi wire (giữ nguyên function_call/output/text) thì lỗi này không thể xảy ra; đổi lại model mất chain-of-thought cũ và reason lại mỗi bước.
+
+## Lấy API key
+
+1. Vào https://opencode.ai/ → nhấn **Zen**.
+2. Nhấn **Get started with Zen**.
+3. Đăng nhập bằng Gmail.
+4. Đăng nhập xong vào mục **API Keys** → copy API key.
+5. Dùng key đó cho `zen add` (`zen-phu` chỉ là tên provider tự đặt — thích tên gì cũng được, ví dụ `zen`, `op-zen`):
+
+```bash
+zen add zen-phu <dán-api-key-vừa-copy> --default
+# nếu chưa chạy `./install.py install` thì dùng:
+python3 install.py add zen-phu <dán-api-key-vừa-copy> --default
+```
 
 ## Yêu cầu
 
