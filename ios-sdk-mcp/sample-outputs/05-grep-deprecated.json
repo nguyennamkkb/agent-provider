@@ -1,0 +1,17 @@
+{
+    "count": 3,
+    "matches": [
+        {
+            "text": "@available(iOS, introduced: 13.0, deprecated: 26.0, message: \"Use string interpolation on `Text` instead: `Text(\\\"Hello \\\\(name)\\\")`\")",
+            "framework": "SwiftUI"
+        },
+        {
+            "text": "@available(macOS, introduced: 10.15, deprecated: 26.0, message: \"Use string interpolation on `Text` instead: `Text(\\\"Hello \\\\(name)\\\")`\")",
+            "framework": "SwiftUI"
+        },
+        {
+            "text": "@available(tvOS, introduced: 13.0, deprecated: 26.0, message: \"Use string interpolation on `Text` instead: `Text(\\\"Hello \\\\(name)\\\")`\")",
+            "framework": "SwiftUI"
+        }
+    ]
+}

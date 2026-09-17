@@ -29,6 +29,7 @@ import {
 import {
   packList,
   packMembers,
+  stripLoc,
   trimAvailability,
   declFromMarker,
   isRealDeprecation,
@@ -494,7 +495,7 @@ server.tool(
       if (out.length >= n) break;
       out.push({ ...h, match: matchLabel(h.name, mainRaw) });
     }
-    const packed = packList(out.map(withAbstract), false);
+    const packed = packList(out.map(withAbstract));
     return { content: [{ type: 'text', text: JSON.stringify(packed) }] };
   },
 );
@@ -539,7 +540,7 @@ server.tool(
     // rg theo tên lẫn parentType qualified/không-qualified và dính scope khác).
     // Chỉ names (không doc): Text 131 members × full doc = ngập context.
     const members = await readScopeMembers(top, include_internal ?? false);
-    const body = { ...trimAvailability(detail), members: packMembers(detail, members, false, 'names') };
+    const body = { ...stripLoc(trimAvailability(detail)), members: packMembers(detail, members, 'names') };
     return {
       content: [{ type: 'text', text: JSON.stringify(body) }],
     };
@@ -556,7 +557,7 @@ server.tool(
     platform: z.string().optional().describe(platformDesc),
     limit: z.number().optional().describe('Max types (default 100, max 500)'),
     offset: z.number().optional().describe('Skip first N (default 0, for paging)'),
-    detail: z.enum(['names', 'abstract']).optional().describe('names (default): kind+name+line only. abstract: +1-line doc + version.'),
+    detail: z.enum(['names', 'abstract']).optional().describe('names (default): kind+name only. abstract: +1-line doc + version.'),
   },
   {
     readOnlyHint: true,
@@ -616,8 +617,8 @@ server.tool(
       .sort((a, b) => a.name.localeCompare(b.name, 'en') || (KIND_ORDER[a.kind] ?? 9) - (KIND_ORDER[b.kind] ?? 9))
       .slice(off, off + n);
     const mapped = d === 'names'
-      ? page.map((h) => ({ k: h.kind, n: h.name, line: h.lineNumber }))
-      : page.map(withAbstract);
+      ? page.map((h) => ({ k: h.kind, n: h.name }))
+      : page.map((h) => stripLoc(withAbstract(h)));
     const body = {
       framework: files[0].framework,
       platform: files[0].platform,
@@ -633,12 +634,12 @@ server.tool(
 // --- get_type_members: "cha có con gì" (phân tầng names/abstract) ---------------
 server.tool(
   'get_type_members',
-  'VERTICAL list of a type\'s members ("what does this parent have?"). WHEN: you have a type name and want its methods/properties/cases. Default detail:"names" (kind+name+line, ~20 tokens/member — Text 131 members fits). Use detail:"abstract" to choose among members, then get_api_detail(member) for full doc. Swift: includes extension members (most modifiers live there). Supports limit/offset paging + kind filter.',
+  'VERTICAL list of a type\'s members ("what does this parent have?"). WHEN: you have a type name and want its methods/properties/cases. Default detail:"names" (kind+name, ~10 tokens/member — Text 131 members fits). Use detail:"abstract" to choose among members, then get_api_detail(member) for full doc. Swift: includes extension members (most modifiers live there). Supports limit/offset paging + kind filter.',
   {
     name: z.string().describe('Type name, short or qualified (e.g. "Text", "WKInterfaceController")'),
     framework: z.string().optional().describe('Filter by framework'),
     kind: z.string().optional().describe('Filter members by kind: func, var, init, case, typealias, struct, enum (e.g. kind:"init" lists only initializers)'),
-    detail: z.enum(['names', 'abstract']).optional().describe('names (default): kind+name+line. abstract: +1-line doc + version.'),
+    detail: z.enum(['names', 'abstract']).optional().describe('names (default): kind+name. abstract: +1-line doc + version.'),
     limit: z.number().optional().describe('Max members (default 100, max 200)'),
     offset: z.number().optional().describe('Skip first N (default 0, for paging)'),
     include_internal: z.boolean().optional().describe('Include internal _-prefixed Apple APIs (default false)'),
@@ -698,30 +699,31 @@ server.tool(
     const off = Math.max(offset ?? 0, 0);
     const d = detail ?? 'names';
     const page = rankHits(deduped, name).slice(off, off + n);
-    // Header mang field chung của type; member chỉ giữ phần riêng.
+    // Header mang field chung của type; member chỉ giữ phần riêng
+    // (không file/line — tham chiếu bằng name).
     const head = typeDecl ?? page[0];
     const body = {
       type: head.name,
       framework: head.framework,
       platform: head.platform,
       lang: head.lang,
-      filePath: head.filePath,
       total,
       offset: off,
       count: page.length,
-      members: packMembers(head, d === 'names' ? page.map(({ docComment: _d, signature: _s, ...r }) => r as ConvertedHit) : page.map(withAbstract), false, d),
+      members: packMembers(head, d === 'names' ? page.map(({ docComment: _d, signature: _s, ...r }) => r as ConvertedHit) : page.map(withAbstract), d),
     };
     return { content: [{ type: 'text', text: JSON.stringify(body) }] };
   },
 );
 
-// --- read_source: đọc source gốc quanh API ------------------------------------
+// --- read_source: đọc source gốc quanh API (tra theo NAME, không cần file/line)
 server.tool(
   'read_source',
-  'Read raw SDK source lines around a declaration. WHEN: verify exact @available lines, see neighboring decls, or inspect a member found by name. NEXT: none (leaf tool). TIP: file+line come from any previous tool output; keep windows small (before<=5, after<=15) to save context.',
+  'Read raw SDK source lines around a declaration, resolved by NAME. WHEN: verify exact @available lines, see neighboring decls, or inspect a member found by name. Pass name (+framework); server locates the decl and returns numbered source lines. NEXT: none (leaf tool). TIP: keep windows small (before<=5, after<=15) to save context.',
   {
-    file: z.string().describe('Absolute SDK file path (from search_apis/detail filePath)'),
-    line: z.number().describe('1-indexed line number'),
+    name: z.string().describe('API name to locate (e.g. "ScrollView", "Text", "foregroundColor"). Takes the top-ranked decl, same as get_api_detail.'),
+    framework: z.string().optional().describe('Framework to narrow the lookup (e.g. "SwiftUI" vs Vision "Text")'),
+    platform: z.string().optional().describe(platformDesc),
     before: z.number().optional().describe('Lines before (default 5, max 30)'),
     after: z.number().optional().describe('Lines after (default 15, max 60)'),
   },
@@ -729,17 +731,20 @@ server.tool(
     readOnlyHint: true,
     openWorldHint: false,
   },
-  async ({ file, line, before, after }) => {
-    // Cho phép cả cache generated-interface (filePath của hit có doc trỏ vào đó).
-    if (!file.startsWith('/Applications/Xcode.app/') && !isCachePath(file)) {
-      return { content: [{ type: 'text', text: 'Refusing to read outside Xcode.app SDKs.' }] };
+  async ({ name, framework, platform, before, after }) => {
+    const files = await filesForDocs(framework, platform);
+    const byPath = filesByPath(files);
+    const cands = preferIos(await locateDecl(name, files, byPath));
+    if (cands.length === 0) {
+      return { content: [{ type: 'text', text: `API "${name}" not found. NEXT: search_apis {"query":"${name}","mode":"fuzzy"} to find the owner type.` }] };
     }
+    const top = (await withDocs(rankHits(cands, name)[0])) ?? rankHits(cands, name)[0];
     const { readWindow } = await import('./sdk.js');
     const b = Math.min(Math.max(before ?? 5, 0), 30);
     const a = Math.min(Math.max(after ?? 15, 0), 60);
-    const win = readWindow(file, line, b, a);
+    const win = readWindow(top.filePath, top.lineNumber, b, a);
     const numbered = win
-      .map((text, i) => `${line - b + i}: ${text}`)
+      .map((text, i) => `${top.lineNumber - b + i}: ${text}`)
       .join('\n');
     return { content: [{ type: 'text', text: numbered }] };
   },
@@ -784,9 +789,11 @@ server.tool(
 );
 
 // --- grep_sdk: ripgrep thô (leaf/debug — KHÔNG dùng để đếm API) -----------------
+// Output gọn: KHÔNG file/line (Agent tra lại bằng name qua read_source).
+// Giữ text dòng match + framework chứa nó — đủ để verify/inspect.
 server.tool(
   'grep_sdk',
-  'LEAF/DEBUG tool: raw fixed-string matches (file+line+text). WHEN: inspect a marker/version string, or verify a declaration exists verbatim. NOT for counting APIs — 1 API spans 4 @available lines (iOS/macOS/tvOS/watchOS); use get_new_apis/get_deprecated for API objects. Prefer search_apis for converted results.',
+  'LEAF/DEBUG tool: raw fixed-string matches (match text + framework). WHEN: inspect a marker/version string, or verify a declaration exists verbatim. Re-locate any hit via read_source {name}. NOT for counting APIs — 1 API spans 4 @available lines (iOS/macOS/tvOS/watchOS); use get_new_apis/get_deprecated for API objects. Prefer search_apis for converted results.',
   {
     pattern: z.string().describe('Fixed string to search (e.g. "scrollTargetBehavior", "deprecated: 26.0")'),
     framework: z.string().optional().describe('Filter by framework'),
@@ -801,16 +808,12 @@ server.tool(
     const files = filesFor(framework, platform);
     const n = Math.min(Math.max(limit ?? 30, 1), 200);
     const matches = await rgMatches(pattern, files, n);
-    // Path lặp ở mọi match nhưng thường chỉ 1-3 file -> bảng id.
-    const paths = [...new Set(matches.map((m) => m.file))];
-    const idOf = new Map(paths.map((p, i) => [p, i + 1]));
-    const body = paths.length === 1
-      ? { file: paths[0], count: matches.length, matches: matches.map((m) => ({ line: m.lineNumber, text: m.lineText })) }
-      : {
-        files: Object.fromEntries(paths.map((p, i) => [i + 1, p])),
-        count: matches.length,
-        matches: matches.map((m) => ({ file: idOf.get(m.file), line: m.lineNumber, text: m.lineText })),
-      };
+    const byPath = filesByPath(files);
+    const out = matches.map((m) => ({
+      text: m.lineText,
+      framework: byPath.get(m.file)?.framework,
+    }));
+    const body = { count: out.length, matches: out };
     return { content: [{ type: 'text', text: JSON.stringify(body) }] };
   },
 );
@@ -903,7 +906,7 @@ server.tool(
       hits.push(withAbstract(hit));
       if (hits.length >= n) break;
     }
-    const packed = packList(rankHits(hits, version), false);
+    const packed = packList(rankHits(hits, version));
     return { content: [{ type: 'text', text: JSON.stringify(packed) }] };
   },
 );
@@ -975,7 +978,7 @@ server.tool(
       hits.push(withAbstract(hit));
       if (hits.length >= n) break;
     }
-    const packed = packList(query ? rankHits(hits, query) : hits, false);
+    const packed = packList(query ? rankHits(hits, query) : hits);
     return { content: [{ type: 'text', text: JSON.stringify(packed) }] };
   },
 );

@@ -1,0 +1,31 @@
+{
+    "type": "Text",
+    "framework": "SwiftUI",
+    "platform": "ios",
+    "lang": "swift",
+    "total": 55,
+    "offset": 0,
+    "count": 5,
+    "members": [
+        {
+            "name": "textVariant",
+            "kind": "func"
+        },
+        {
+            "name": "textScale",
+            "kind": "func"
+        },
+        {
+            "name": "accessibilityTextContentType",
+            "kind": "func"
+        },
+        {
+            "name": "LineStyle",
+            "kind": "struct"
+        },
+        {
+            "name": "DateStyle",
+            "kind": "struct"
+        }
+    ]
+}

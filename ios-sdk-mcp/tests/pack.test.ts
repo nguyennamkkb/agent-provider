@@ -30,61 +30,57 @@ describe('trimAvailability: bỏ chuỗi khi đã có số', () => {
   });
 });
 
-describe('packList: hoist field chung + bảng files', () => {
+describe('packList: hoist field chung, KHÔNG file/line', () => {
   it('field 1 giá trị -> lên header, biến mất khỏi item', () => {
-    const p = packList([hit(), hit({ name: 'Bar', lineNumber: 20 })], false);
+    const p = packList([hit(), hit({ name: 'Bar' })]);
     expect(p.framework).toBe('SwiftUI');
     expect(p.platform).toBe('ios');
-    expect(p.filePath).toBe('/sdk/SwiftUI.swift');
     expect(p.count).toBe(2);
     const apis = p.apis as Record<string, unknown>[];
     expect(apis[0].framework).toBeUndefined();
-    expect(apis[0].filePath).toBeUndefined();
-    expect(apis[0].line).toBe(10); // lineNumber -> line
+    expect(apis[0].name).toBe('Foo');
   });
 
-  it('nhiều file -> bảng files + item mang id', () => {
+  it('không filePath/lineNumber/bảng files trong output', () => {
     const p = packList([
       hit(),
       hit({ name: 'B', filePath: '/sdk/UIKit.swift', framework: 'UIKit' }),
       hit({ name: 'C', filePath: '/sdk/UIKit.swift', framework: 'UIKit' }),
-    ], false);
-    expect(p.filePath).toBeUndefined();
-    const files = p.files as Record<string, string>;
-    expect(Object.keys(files)).toHaveLength(2);
+    ]);
+    expect(p).not.toHaveProperty('filePath');
+    expect(p).not.toHaveProperty('files');
     const apis = p.apis as Record<string, unknown>[];
-    expect(apis[1].file).toBe(files['1'] === '/sdk/UIKit.swift' ? 1 : 2);
-    expect(apis[1].filePath).toBeUndefined();
+    for (const a of apis) {
+      expect(a).not.toHaveProperty('filePath');
+      expect(a).not.toHaveProperty('lineNumber');
+      expect(a).not.toHaveProperty('line');
+      expect(a).not.toHaveProperty('file');
+    }
     // framework khác nhau -> KHÔNG hoist
     expect(p.framework).toBeUndefined();
     expect(apis[0].framework).toBe('SwiftUI');
   });
-
-  it('verbose: trả nguyên bản', () => {
-    const p = packList([hit({ availability: '@available(iOS 13.0, *)', introducedIn: 130000 })], true);
-    const apis = p.apis as ConvertedHit[];
-    expect(apis[0].filePath).toBe('/sdk/SwiftUI.swift');
-    expect(apis[0].availability).toBeDefined();
-    expect(apis[0].lineNumber).toBe(10);
-  });
 });
 
-describe('packMembers: bỏ thứ kế thừa từ cha', () => {
+describe('packMembers: bỏ thứ kế thừa từ cha, KHÔNG file/line', () => {
   const parent = hit({ introducedIn: 130000, availability: '@available(iOS 13.0, *)' });
-  it('member cùng file/version với cha -> bỏ cả hai field', () => {
+  it('member cùng version với cha -> bỏ version, chỉ còn kind+name', () => {
     const [m] = packMembers(parent, [
       hit({ name: 'axes', kind: 'var', parentType: 'Foo', introducedIn: 130000, availability: '@available(iOS 13.0, *)', lineNumber: 12 }),
-    ], false);
+    ], 'names');
     expect(m.framework).toBeUndefined();
     expect(m.parentType).toBeUndefined();
     expect(m.filePath).toBeUndefined();
+    expect(m.lineNumber).toBeUndefined();
+    expect(m).not.toHaveProperty('line');
     expect(m.introducedIn).toBeUndefined();
-    expect(m.line).toBe(12);
     expect(m.name).toBe('axes');
+    expect(m.kind).toBe('var');
   });
   it('member version KHÁC cha -> giữ lại (thông tin thật)', () => {
-    const [m] = packMembers(parent, [hit({ name: 'newer', introducedIn: 260000, lineNumber: 13 })], false);
+    const [m] = packMembers(parent, [hit({ name: 'newer', introducedIn: 260000, lineNumber: 13 })], 'abstract');
     expect(m.introducedIn).toBe(260000);
+    expect(m).not.toHaveProperty('lineNumber');
   });
 });
 

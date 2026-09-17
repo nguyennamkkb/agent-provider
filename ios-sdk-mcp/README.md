@@ -64,13 +64,13 @@ list_frameworks(query) → list_types(framework) → get_type_members(type) → 
 ```
 
 - **Dọc** (đã biết cha): rẻ, deterministic — `list_types` (~200 tok) →
-  `members names-only` (~20 tok/member) → `detail` full doc 1 API.
+  `members names-only` (~10 tok/member) → `detail` full doc 1 API.
 - **Ngang** (chỉ có từ khóa): `search_apis` — exact block (`match:"exact"`)
   lên trước, fuzzy (`prefix|contains|fuzzy`) sau. `mode:"exact"` khi đã biết
   tên; `mode:"fuzzy"` khi khám phá.
-- **Nhẹ phân tầng**: `detail:"names"` (default, kind+name+line) →
+- **Nhẹ phân tầng**: `detail:"names"` (default, kind+name) →
   `"abstract"` (chọn member) → `get_api_detail` (full doc).
-- Mặc định **platform ios** (line-number đúng file iPhone); `platform:"all"`
+- Mặc định **platform ios**; `platform:"all"`
   khi hỏi đa nền tảng. `get_api_detail` không tìm thấy → gợi ý NEXT step.
 - `get_deprecated` giữ `renamedTo` (+message trong marker) để migrate;
   `get_new_apis` lọc đúng `introducedIn` version hỏi; `grep_sdk` là leaf/debug.

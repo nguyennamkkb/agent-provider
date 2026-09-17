@@ -1,7 +1,7 @@
 {
     "platform": "ios",
     "lang": "swift",
-    "count": 5,
+    "count": 3,
     "apis": [
         {
             "name": "Text",
@@ -10,9 +10,7 @@
             "signature": "@frozen public struct Text : Equatable, Sendable",
             "introducedIn": 130000,
             "docComment": "A view that displays one or more lines of read-only text.",
-            "filePath": "/Users/nguyenluongnam/.cache/ios-sdk-mcp/27A266a/ios/SwiftUI/SwiftUI.swift",
-            "match": "exact",
-            "line": 82524
+            "match": "exact"
         },
         {
             "name": "Text",
@@ -21,9 +19,7 @@
             "signature": "@frozen public struct Text : Equatable, Sendable",
             "introducedIn": 130000,
             "docComment": "A view that displays one or more lines of read-only text.",
-            "filePath": "/Users/nguyenluongnam/.cache/ios-sdk-mcp/27A266a/ios/SwiftUICore/SwiftUICore.swift",
-            "match": "exact",
-            "line": 32179
+            "match": "exact"
         },
         {
             "name": "Text",
@@ -31,28 +27,7 @@
             "framework": "TelephonyMessagingKit",
             "signature": "public struct Text : Swift::ExpressibleByStringLiteral, Swift::Equatable, Swift::Codable, Swift::Sendable",
             "introducedIn": 260000,
-            "filePath": "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk/System/Library/Frameworks/TelephonyMessagingKit.framework/Modules/TelephonyMessagingKit.swiftmodule/arm64e-apple-ios.swiftinterface",
-            "match": "exact",
-            "line": 607
-        },
-        {
-            "name": "Text",
-            "kind": "struct",
-            "framework": "Vision",
-            "signature": "public struct Text : Vision::BoundingRegionProviding, Swift::Sendable, Swift::Equatable, Swift::Hashable, Swift::Codable",
-            "filePath": "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk/System/Library/Frameworks/Vision.framework/Modules/Vision.swiftmodule/arm64e-apple-ios.swiftinterface",
-            "match": "exact",
-            "line": 822
-        },
-        {
-            "name": "Text",
-            "kind": "struct",
-            "framework": "VisionKit",
-            "signature": "public struct Text : Swift::Identifiable",
-            "introducedIn": 160000,
-            "filePath": "/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk/System/Library/Frameworks/VisionKit.framework/Modules/VisionKit.swiftmodule/arm64e-apple-ios.swiftinterface",
-            "match": "exact",
-            "line": 27
+            "match": "exact"
         }
     ]
 }

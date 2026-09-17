@@ -13,20 +13,29 @@ export function trimAvailability<T extends ConvertedHit>(h: T): T {
   return rest as T;
 }
 
+/** Xóa vị trí file khỏi output: filePath/lineNumber chỉ dùng NỘI BỘ
+ * (locateDecl/readWindow/analyzeContext), Agent đọc không cần — path dài
+ * ~80-100 ký tự lặp lại mỗi hit, line-number giòn theo bản Xcode.
+ * Tham chiếu giữa các tool bằng name (+framework); read_source tra theo name. */
+export function stripLoc<T extends { filePath?: unknown; lineNumber?: unknown }>(h: T): Omit<T, 'filePath' | 'lineNumber'> {
+  const { filePath: _fp, lineNumber: _ln, ...rest } = h;
+  void _fp;
+  void _ln;
+  return rest;
+}
+
 /** Field lặp ở MỌI phần tử và chỉ có 1 giá trị -> đưa lên header response. */
-export const HOISTABLE = ['framework', 'platform', 'lang', 'filePath', 'parentType'] as const;
+export const HOISTABLE = ['framework', 'platform', 'lang', 'parentType'] as const;
 
 /**
  * Đóng gói 1 danh sách hit: tách field chung lên `common`, phần còn lại giữ
- * trong từng item. `filePath` khác nhau thì gom vào bảng `files` (id -> path)
- * và item chỉ mang `file: <id>` — path SDK dài ~80-100 ký tự, lặp 20-55 lần.
+ * trong từng item. KHÔNG filePath/lineNumber/bảng files trong output
+ * (xem stripLoc) — item định danh bằng name (+framework ở header).
  */
 export function packList(
   hits: ConvertedHit[],
-  verbose: boolean,
 ): Record<string, unknown> {
-  if (verbose) return { count: hits.length, apis: hits };
-  const slim = hits.map(trimAvailability).map((h) => ({ ...h }) as Record<string, unknown>);
+  const slim = hits.map(trimAvailability).map((h) => ({ ...stripLoc(h) }) as Record<string, unknown>);
   const common: Record<string, unknown> = {};
   for (const f of HOISTABLE) {
     const vals = new Set(slim.map((h) => h[f]).filter((v) => v !== undefined));
@@ -35,30 +44,8 @@ export function packList(
       for (const h of slim) delete h[f];
     }
   }
-  let files: Record<number, string> | undefined;
-  if (!('filePath' in common)) {
-    const paths = [...new Set(slim.map((h) => h.filePath as string).filter(Boolean))];
-    if (paths.length > 0 && paths.length < slim.length) {
-      files = Object.fromEntries(paths.map((p, i) => [i + 1, p]));
-      const idOf = new Map(paths.map((p, i) => [p, i + 1]));
-      for (const h of slim) {
-        if (h.filePath) {
-          h.file = idOf.get(h.filePath as string);
-          delete h.filePath;
-        }
-      }
-    }
-  }
-  // lineNumber -> line (ngắn hơn, cùng nghĩa)
-  for (const h of slim) {
-    if (h.lineNumber !== undefined) {
-      h.line = h.lineNumber;
-      delete h.lineNumber;
-    }
-  }
   return {
     ...common,
-    ...(files ? { files } : {}),
     count: slim.length,
     apis: slim,
   };
@@ -71,14 +58,14 @@ export type MemberDetail = 'names' | 'abstract' | 'full';
 
 /** Như packList nhưng cho members của 1 type (đã biết cha -> bỏ field kế thừa).
  * List KHÔNG bao giờ trả full doc: ép abstract để 1 member doc dài 5KB
- * không ngập context Agent (lỗi đã đo: docLens [26,80,170,515,44,187]). */
+ * không ngập context Agent (lỗi đã đo: docLens [26,80,170,515,44,187]).
+ * Vị trí (filePath/lineNumber) KHÔNG ra output — Agent tham chiếu members
+ * bằng name; cần đọc source thì read_source theo name. */
 export function packMembers(
   parent: ConvertedHit,
   members: ConvertedHit[],
-  verbose: boolean,
   detail: MemberDetail = 'abstract',
 ): Record<string, unknown>[] {
-  if (verbose) return members as unknown as Record<string, unknown>[];
   return members.map((m) => {
     const h = { ...trimAvailability(m) } as Record<string, unknown>;
     // Suy được từ header/cha -> bỏ.
@@ -86,7 +73,8 @@ export function packMembers(
     delete h.platform;
     delete h.lang;
     delete h.parentType;
-    if (h.filePath === parent.filePath) delete h.filePath;
+    delete h.filePath;
+    delete h.lineNumber;
     if (h.introducedIn === parent.introducedIn) delete h.introducedIn;
     if (h.availability === parent.availability) delete h.availability;
     delete h.platforms;
@@ -105,8 +93,6 @@ export function packMembers(
       h.docComment = first.length > 240 ? `${first.slice(0, 239)}…` : first;
       if (!h.docComment) delete h.docComment;
     }
-    h.line = h.lineNumber;
-    delete h.lineNumber;
     return h;
   });
 }

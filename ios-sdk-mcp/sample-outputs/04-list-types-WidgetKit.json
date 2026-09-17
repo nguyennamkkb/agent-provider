@@ -3,47 +3,27 @@
     "platform": "ios",
     "total": 57,
     "offset": 0,
-    "count": 8,
+    "count": 5,
     "types": [
         {
             "k": "struct",
-            "n": "AccessoryWidgetBackground",
-            "line": 38
+            "n": "AccessoryWidgetBackground"
         },
         {
             "k": "struct",
-            "n": "ActivityConfiguration",
-            "line": 84
+            "n": "ActivityConfiguration"
         },
         {
             "k": "enum",
-            "n": "ActivityFamily",
-            "line": 179
+            "n": "ActivityFamily"
         },
         {
             "k": "enum",
-            "n": "ActivityPreviewViewKind",
-            "line": 281
+            "n": "ActivityPreviewViewKind"
         },
         {
             "k": "struct",
-            "n": "ActivityViewContext",
-            "line": 369
-        },
-        {
-            "k": "struct",
-            "n": "AppIntentConfiguration",
-            "line": 429
-        },
-        {
-            "k": "struct",
-            "n": "AppIntentControlConfiguration",
-            "line": 507
-        },
-        {
-            "k": "protocol",
-            "n": "AppIntentControlValueProvider",
-            "line": 579
+            "n": "ActivityViewContext"
         }
     ]
 }
