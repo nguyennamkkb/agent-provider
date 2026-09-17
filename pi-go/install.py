@@ -538,6 +538,23 @@ def cmd_add_go(provider: str, key: str, make_default: bool, home: Path) -> None:
     save_json(auth_path, auth)
     print(f"Đã ghi provider '{provider}' + {len(GO_PRESETS)} models Go")
 
+    # Pi lọc /model và --list-models theo settings.enabledModels (nếu có).
+    # Không có entry nào khớp provider mới => user chỉ thấy list cũ.
+    # Tự thêm "<provider>/*" để 37 models hiện ngay, giữ nguyên list cũ.
+    settings = load_json(settings_path)
+    enabled = settings.get("enabledModels")
+    if isinstance(enabled, list):
+        want = f"{provider}/*"
+        if want not in enabled:
+            shutil.copy(settings_path, str(settings_path) + ".bak")
+            settings["enabledModels"] = enabled + [want]
+            save_json(settings_path, settings)
+            print(f"Đã thêm '{want}' vào enabledModels "
+                  f"({len(enabled)} -> {len(enabled) + 1} patterns)")
+    else:
+        print("INFO: settings chưa có enabledModels (hiện toàn bộ catalogue) "
+              "— không cần thêm gì")
+
     if make_default:
         shutil.copy(settings_path, str(settings_path) + ".bak")
         settings = load_json(settings_path)

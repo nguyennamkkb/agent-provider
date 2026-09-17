@@ -41,7 +41,7 @@ python3 install.py add <provider-id> <api-key> --default
 
 | Lệnh | Tác dụng |
 |---|---|
-| `add` | Ghi provider + 37 models Go (thông số từ `models.dev.json`) vào `models.json`/`auth.json`. `--default` đặt làm provider mặc định (`deepseek-v4-flash`). Alias: `add-go`. |
+| `add` | Ghi provider + 37 models Go (thông số từ `models.dev.json`) vào `models.json`/`auth.json`, tự thêm `<provider>/*` vào `settings.enabledModels` (nếu setting này có — Pi lọc `/model` theo nó, thiếu là chỉ thấy list cũ). `--default` đặt làm provider mặc định (`deepseek-v4-flash`). Alias: `add-go`. |
 | `sync` | Quét `/models` trên Go, probe `Say OK` từng model (thử đủ 3 endpoint, mapped trước), giữ spec models.dev cho model đã biết, merge vào `models.json`. `--only deepseek` chỉ probe 1 model/họ. `--dry-run` chỉ in, không ghi. Alias: `sync-go`. Model lạ (có trên `/models` nhưng chưa có spec): ghi với context default; model trong spec nhưng `/models` không còn: vẫn giữ (add ghi đủ 37). |
 | `doctor` | Kiểm tra pi, extension, lệnh `pigo`, provider Go trong `models.json`. |
 | `install` | Cài lệnh `pigo` vào PATH (+extension nếu `--with-ext`). |

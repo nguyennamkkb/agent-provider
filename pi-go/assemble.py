@@ -82,6 +82,30 @@ go_defs = (p["cmd_add_go"].rstrip() + "\n\n\n"
 rep("def new_id(prefix: str, descending: bool) -> str:",
     go_defs + "def new_id(prefix: str, descending: bool) -> str:")
 
+# --- 5b. cmd_add_go: tự thêm "<provider>/*" vào settings.enabledModels ---
+# Pi lọc /model theo enabledModels (nếu có). Không có pattern khớp provider
+# mới => user chỉ thấy list cũ. Thêm vào để models hiện ngay, giữ list cũ.
+_add_go_anchor = '    print(f"Đã ghi provider \'{provider}\' + {len(GO_PRESETS)} models Go")\n'
+_add_go_note = '''
+    # Pi lọc /model và --list-models theo settings.enabledModels (nếu có).
+    # Không có entry nào khớp provider mới => user chỉ thấy list cũ.
+    # Tự thêm "<provider>/*" để 37 models hiện ngay, giữ nguyên list cũ.
+    settings = load_json(settings_path)
+    enabled = settings.get("enabledModels")
+    if isinstance(enabled, list):
+        want = f"{provider}/*"
+        if want not in enabled:
+            shutil.copy(settings_path, str(settings_path) + ".bak")
+            settings["enabledModels"] = enabled + [want]
+            save_json(settings_path, settings)
+            print(f"Đã thêm \'{want}\' vào enabledModels "
+                  f"({len(enabled)} -> {len(enabled) + 1} patterns)")
+    else:
+        print("INFO: settings chưa có enabledModels (hiện toàn bộ catalogue) "
+              "— không cần thêm gì")
+'''
+rep(_add_go_anchor, _add_go_anchor + _add_go_note)
+
 # --- 6. doctor: lọc /go khỏi Zen + thêm report Go ---
 rep(p["zen_old"], p["zen_new"])
 rep('            print("[WARN] chưa có provider Zen nào, chạy: zen add <id> <key>")',
