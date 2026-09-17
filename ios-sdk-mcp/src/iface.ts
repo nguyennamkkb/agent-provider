@@ -41,8 +41,8 @@ const TRIPLE_PREFIX: Record<SdkPlatform, string> = {
 
 const versionCache = new Map<SdkPlatform, string | null>();
 
-/** Version SDK ("26.2") qua xcrun; null nếu platform không cài. */
-function sdkVersion(platform: SdkPlatform): string | null {
+/** Version SDK ("26.2") qua xcrun; null nếu platform không cài. Export để get_sdk_stats báo cho Agent biết đang đọc SDK nào. */
+export function sdkVersion(platform: SdkPlatform): string | null {
   if (versionCache.has(platform)) return versionCache.get(platform)!;
   let v: string | null = null;
   try {
@@ -66,7 +66,7 @@ function targetTriple(platform: SdkPlatform): string | null {
 
 /** Build của Xcode (17C52...) — đổi Xcode là cache key đổi, không stale. */
 let xcodeBuild: string | null = null;
-function buildKey(): string {
+export function buildKey(): string {
   if (xcodeBuild) return xcodeBuild;
   let key = 'unknown';
   try {

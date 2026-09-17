@@ -983,16 +983,17 @@ server.tool(
   },
 );
 
-// --- get_sdk_stats --------------------------------------------------------------
+// --- get_sdk_stats: cho Agent biết đang đọc SDK nào ----------------------------
 server.tool(
   'get_sdk_stats',
-  'Corpus stats: file counts per platform/lang (no index). WHEN: debugging empty results (wrong SDK? missing platform?). NOT for normal API lookup.',
+  'Environment + corpus stats: Xcode build, per-platform SDK versions (via xcrun, auto-detected), file counts. WHEN: start of session (know what "latest" means — introducedIn is relative to THESE versions), or debugging empty results. NOT for normal API lookup.',
   {},
   {
     readOnlyHint: true,
     openWorldHint: false,
   },
   async () => {
+    const { buildKey, sdkVersion } = await import('./iface.js');
     const all = discoverFiles();
     const byPlatform: Record<string, number> = {};
     const byLang: Record<string, number> = {};
@@ -1002,11 +1003,18 @@ server.tool(
       byLang[f.lang] = (byLang[f.lang] ?? 0) + 1;
       fwSet.add(`${f.platform}:${f.framework}`);
     }
+    const plats: SdkPlatform[] = ['ios', 'watchos', 'macos', 'tvos', 'xros'];
+    const sdkVersions: Record<string, string | null> = {};
+    for (const p of plats) sdkVersions[p] = sdkVersion(p);
     return {
       content: [{
         type: 'text',
         text: JSON.stringify(
-          { totalFiles: all.length, byPlatform, byLang, frameworkSlots: fwSet.size },
+          {
+            xcodeBuild: buildKey(),
+            sdkVersions,
+            totalFiles: all.length, byPlatform, byLang, frameworkSlots: fwSet.size,
+          },
         ),
       }],
     };
