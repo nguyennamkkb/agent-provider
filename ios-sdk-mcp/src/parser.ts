@@ -428,7 +428,8 @@ export function matchSwiftDecl(rest: string): SwiftDecl | null {
   }
   m = s.match(/^(var|let)\s+(\w+)/);
   if (m) return { kind: 'var', names: [m[2]] };
-  if (/^init[?!]?(?=\s*\()/.test(s)) return { kind: 'init', names: ['init'] };
+  // Generic init: `init<Content>(for ...)` — generic params sau init.
+  if (/^init[?!]?(<[^>]*>)?(?=\s*\()/.test(s)) return { kind: 'init', names: ['init'] };
   if (/^deinit\b/.test(s)) return null;
   if (/^subscript\b/.test(s)) return { kind: 'func', names: ['subscript'] };
   m = s.match(/^typealias\s+(\w+)/);

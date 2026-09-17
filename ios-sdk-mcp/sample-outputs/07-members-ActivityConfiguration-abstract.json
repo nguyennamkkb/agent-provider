@@ -1,0 +1,29 @@
+{
+    "type": "ActivityConfiguration",
+    "framework": "WidgetKit",
+    "platform": "ios",
+    "lang": "swift",
+    "total": 3,
+    "offset": 0,
+    "count": 3,
+    "members": [
+        {
+            "name": "body",
+            "kind": "var",
+            "signature": "@MainActor @preconcurrency public var body: some WidgetConfiguration",
+            "docComment": "The content and behavior of this widget."
+        },
+        {
+            "name": "Body",
+            "kind": "typealias",
+            "signature": "public typealias Body = some WidgetConfiguration",
+            "docComment": "The type of widget configuration representing the body of this configuration."
+        },
+        {
+            "name": "init",
+            "kind": "init",
+            "signature": "@MainActor @preconcurrency public init<Content>(for attributesType: Attributes.Type, @ViewBuilder content: @escaping (ActivityViewContext<Attributes>) -> Content, dynamicIsland: @escaping (ActivityViewContext<Attributes>) -> DynamicIsland) where Content : View",
+            "docComment": "Creates a configuration object for a Live Activity."
+        }
+    ]
+}

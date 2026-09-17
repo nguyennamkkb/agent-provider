@@ -11,3 +11,5 @@ không còn `filePath`/`line`/`lineNumber`/bảng `files` trong output
 | `03-members-Text-names.json` | `get_type_members {"name":"Text","framework":"SwiftUI","limit":5}` | ~78 tok | DỌC cha→con: kind+name, `total:55` + paging |
 | `04-list-types-WidgetKit.json` | `list_types {"framework":"WidgetKit","limit":5}` | ~73 tok | DỌC framework → types, sort alpha |
 | `05-grep-deprecated.json` | `grep_sdk {"pattern":"deprecated: 26.0","framework":"SwiftUI","limit":3}` | ~139 tok | LEAF/debug: text + framework, không file/line |
+| `06-detail-ActivityConfiguration.json` | `get_api_detail {"name":"ActivityConfiguration"}` | ~145 tok | Case Live Activity: đủ 3 members (init/body/Body) sau fix generic-init |
+| `07-members-ActivityConfiguration-abstract.json` | `get_type_members {"name":"ActivityConfiguration","framework":"WidgetKit","detail":"abstract"}` | ~216 tok | abstract: signature init đầy đủ params — đọc là biết dùng thế nào |

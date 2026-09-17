@@ -1,0 +1,24 @@
+{
+    "name": "ActivityConfiguration",
+    "kind": "struct",
+    "framework": "WidgetKit",
+    "lang": "swift",
+    "platform": "ios",
+    "signature": "@MainActor @preconcurrency public struct ActivityConfiguration<Attributes> : WidgetConfiguration where Attributes : ActivityAttributes",
+    "introducedIn": 160100,
+    "docComment": "An object that describes the content of a Live Activity.\n\nTo learn more about offering Live Activities for your app, see\n<doc://com.apple.documentation/documentation/ActivityKit>.",
+    "members": [
+        {
+            "name": "init",
+            "kind": "init"
+        },
+        {
+            "name": "body",
+            "kind": "var"
+        },
+        {
+            "name": "Body",
+            "kind": "typealias"
+        }
+    ]
+}
