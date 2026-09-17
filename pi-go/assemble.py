@@ -125,7 +125,7 @@ rep('    s = sub.add_parser("sync", help="Quét model free trên Zen, probe và 
     '    s.add_argument("--key", default=None)\n'
     '    s.add_argument("--dry-run", action="store_true")',
     '    s = sub.add_parser("sync", help="Probe models Go trên endpoint thật, merge vào models.json")\n'
-    '    s.add_argument("--provider", default="op-go-hoang")\n'
+    '    s.add_argument("--provider", default="op-go-nam")\n'
     '    s.add_argument("--key", default=None)\n'
     '    s.add_argument("--dry-run", action="store_true")\n'
     '    s.add_argument("--only", default=None,\n'

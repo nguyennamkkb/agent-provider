@@ -39,12 +39,12 @@ python3 pi-zen/install.py add zen-phu <dán-api-key-vừa-copy> --default
 
 1. Vào https://opencode.ai/ → đăng nhập → subscribe **Go**.
 2. Copy API key Go.
-3. Dùng key đó cho pi-go (`op-go-hoang` chỉ là tên provider tự đặt):
+3. Dùng key đó cho pi-go (`op-go-nam` chỉ là tên provider tự đặt):
 
 ```bash
-pigo add op-go-hoang <dán-api-key-go> --default
+pigo add op-go-nam <dán-api-key-go> --default
 # nếu chưa chạy `./pi-go/install.py install` thì dùng:
-python3 pi-go/install.py add op-go-hoang <dán-api-key-go> --default
+python3 pi-go/install.py add op-go-nam <dán-api-key-go> --default
 ```
 
 Chi tiết xem README trong từng thư mục.

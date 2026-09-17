@@ -20,7 +20,7 @@ function isGoProvider(ctx: ExtensionContext): boolean {
     // bỏ qua, dùng fallback bên dưới
   }
   return (
-    providerId === "op-go-hoang" ||
+    providerId === "op-go-nam" ||
     providerId.startsWith("op-go-") ||
     providerId.startsWith("go-")
   );

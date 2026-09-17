@@ -1063,7 +1063,7 @@ def build_parser() -> argparse.ArgumentParser:
     a.add_argument("--default", action="store_true")
 
     s = sub.add_parser("sync", help="Probe models Go trên endpoint thật, merge vào models.json")
-    s.add_argument("--provider", default="op-go-hoang")
+    s.add_argument("--provider", default="op-go-nam")
     s.add_argument("--key", default=None)
     s.add_argument("--dry-run", action="store_true")
     s.add_argument("--only", default=None,
@@ -1078,14 +1078,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("doctor", help="Kiểm tra cài đặt (pi, bin, provider, headers)")
     g = sub.add_parser("add-go", help="Thêm provider OpenCode Go (key + endpoint riêng)")
-    g.add_argument("provider_id", nargs="?", default="op-go-hoang")
+    g.add_argument("provider_id", nargs="?", default="op-go-nam")
     g.add_argument("api_key", nargs="?", default=None)
     g.add_argument("--default", action="store_true")
     g.add_argument("--refresh-headers", action="store_true",
                    help="chỉ refresh headers tĩnh, giữ nguyên models")
 
     gs = sub.add_parser("sync-go", help="Probe models Go trên endpoint thật")
-    gs.add_argument("--provider", default="op-go-hoang")
+    gs.add_argument("--provider", default="op-go-nam")
     gs.add_argument("--key", default=None)
     gs.add_argument("--dry-run", action="store_true")
     gs.add_argument("--only", default=None,

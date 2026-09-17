@@ -49,8 +49,8 @@ python3 install.py add <provider-id> <api-key> --default
 Mọi lần ghi file đều backup `.bak` trước. Ví dụ:
 
 ```bash
-pigo add op-go-hoang sk-xxx --default
-pigo sync --provider op-go-hoang --only deepseek --dry-run
+pigo add op-go-nam sk-xxx --default
+pigo sync --provider op-go-nam --only deepseek --dry-run
 ```
 
 `models.dev.json` là sub-catalog `opencode-go` trích từ https://models.dev/
@@ -129,12 +129,12 @@ lại mỗi bước.
 
 1. Vào https://opencode.ai/ → đăng nhập → subscribe **Go** ($10/tháng).
 2. Copy API key Go (khác key Zen free).
-3. Dùng key đó cho `pigo add` (`op-go-hoang` chỉ là tên provider tự đặt):
+3. Dùng key đó cho `pigo add` (`op-go-nam` chỉ là tên provider tự đặt):
 
 ```bash
-pigo add op-go-hoang <dán-api-key-go> --default
+pigo add op-go-nam <dán-api-key-go> --default
 # nếu chưa chạy `./install.py install` thì dùng:
-python3 install.py add op-go-hoang <dán-api-key-go> --default
+python3 install.py add op-go-nam <dán-api-key-go> --default
 ```
 
 ## Yêu cầu
