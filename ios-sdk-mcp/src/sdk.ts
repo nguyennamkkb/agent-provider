@@ -29,18 +29,40 @@ export interface RgMatch {
   lineText: string;
 }
 
-const GLOBS = ['*.swiftinterface', '*.h'];
+// *.swift: generated interface đã cache (nguồn Swift DUY NHẤT có doc comment,
+// xem iface.ts). Không có .swift trong SDK Frameworks nên glob này chỉ trúng cache.
+const GLOBS = ['*.swiftinterface', '*.h', '*.swift'];
 
 // --- file discovery (1 lần, cache) ------------------------------------------
 
 let fileCache: SdkFile[] | null = null;
+let fileCacheByPlatform = new Map<string, SdkFile[]>();
 
-/** Liệt kê mọi .swiftinterface + .h trong SDKs. Chạy 1 lần rồi cache. */
+/** Liệt kê mọi .swiftinterface + .h trong SDKs. Chạy 1 lần rồi cache
+ * (cả full lẫn theo từng platform — .filter() 20k rows mỗi query tốn ~ms
+ * nhưng cộng dồn qua nhiều tools; cache key theo platform rẻ hơn). */
 export function discoverFiles(platforms?: SdkPlatform[]): SdkFile[] {
   if (fileCache) {
-    return platforms ? fileCache.filter((f) => platforms.includes(f.platform)) : fileCache;
+    if (!platforms) return fileCache;
+    const key = [...platforms].sort().join(',');
+    let hit = fileCacheByPlatform.get(key);
+    if (!hit) {
+      hit = fileCache.filter((f) => platforms.includes(f.platform));
+      fileCacheByPlatform.set(key, hit);
+    }
+    return hit;
   }
   const out: SdkFile[] = [];
+  // Dedup symlink: macOS .framework/{Modules,Headers} -> Versions/Current/... .
+  // Không dedup, rg liệt kê CẢ path logical (Modules/...) lẫn physical
+  // (Versions/A/...) -> trùng file, convertOK tính 2 lần, pull chain sai.
+  // Chuẩn hóa mọi path về realpath: rg -P cũng trả realpath nên byPath khớp.
+  const seenReal = new Set<string>();
+  const reg = (realPath: string, _logicalPath: string, framework: string, platform: SdkPlatform, lang: 'swift' | 'objc') => {
+    if (seenReal.has(realPath)) return;
+    seenReal.add(realPath);
+    out.push({ path: realPath, framework, platform, lang });
+  };
   const wanted = platforms ?? (Object.keys(SDK_PATHS) as SdkPlatform[]);
   for (const p of wanted) {
     const sdk = SDK_PATHS[p];
@@ -54,7 +76,8 @@ export function discoverFiles(platforms?: SdkPlatform[]): SdkFile[] {
       if (fs.existsSync(modDir)) {
         for (const f of fs.readdirSync(modDir)) {
           if (f.endsWith('.swiftinterface')) {
-            out.push({ path: path.join(modDir, f), framework: fwName, platform: p, lang: 'swift' });
+            const lp = path.join(modDir, f);
+            reg(fs.realpathSync(lp), lp, fwName, p, 'swift');
           }
         }
       }
@@ -62,7 +85,8 @@ export function discoverFiles(platforms?: SdkPlatform[]): SdkFile[] {
       if (fs.existsSync(hdrDir)) {
         for (const f of fs.readdirSync(hdrDir)) {
           if (f.endsWith('.h')) {
-            out.push({ path: path.join(hdrDir, f), framework: fwName, platform: p, lang: 'objc' });
+            const lp = path.join(hdrDir, f);
+            reg(fs.realpathSync(lp), lp, fwName, p, 'objc');
           }
         }
       }
@@ -92,18 +116,128 @@ export function listFrameworksFast(platforms?: SdkPlatform[]): { name: string; p
 
 function rgArgs(dirs: string[], extra: string[]): string[] {
   const args: string[] = [];
-  for (const g of GLOBS) args.push('--glob', g);
-  args.push(...extra, '--', ...dirs);
+  for (const g of GLOBS) args.push('-g', g);
+  // --no-messages + --no-config: bỏ warning/time đọc config.
+  // -P/--no-follow: KHÔNG theo symlink (macOS Modules -> Versions/Current
+  // làm rg quét trùng file, trả path Versions/A/... lệch với discover).
+  args.push('--no-messages', '--no-config', '-P', ...extra, '--', ...dirs);
   return args;
 }
 
+/** Gom dirs theo SDK Frameworks root (1 root/SDK thay vì 1414 dirname):
+ * rg spawn + walk ít hơn (~350ms -> ~50ms cho no-match toàn corpus).
+ * VD: .../iPhoneOS.sdk/System/Library/Frameworks (rg tự --glob lọc). */
 function toDirs(files: SdkFile[]): string[] {
-  return [...new Set(files.map((f) => path.dirname(f.path)))];
+  // Tập nhỏ (đã lọc framework / chỉ vài file): quét ĐÚNG thư mục của chúng.
+  // Gom về root ở đây là sai: rg quét cả SDK rồi caller vứt match lạ, `-m limit`
+  // bị đốt vào framework khác -> lọc framework=SwiftUI vẫn nhận hit UIKit.
+  if (files.length <= 40) {
+    return [...new Set(files.map((f) => path.dirname(f.path)))];
+  }
+  const roots = new Set<string>();
+  for (const f of files) {
+    const idx = f.path.lastIndexOf('/System/Library/Frameworks/');
+    if (idx >= 0) {
+      roots.add(f.path.slice(0, idx + '/System/Library/Frameworks'.length));
+    } else {
+      roots.add(path.dirname(f.path));
+    }
+  }
+  return [...roots];
 }
 
-/** Chạy rg --json, trả matches (file + dòng). Fixed-strings, case-insensitive.
+/** Chạy rg --json, trả matches (file + dòng). Fixed-strings.
  * LƯU Ý: -F match substring nên '@interface Foo' cũng dính '@protocol FooBar;'.
- * Caller lọc tiếp bằng regex neo từ (/\b/) — xem direct.test.ts UIScrollView. */
+ * Caller lọc tiếp bằng regex neo từ (/\b/) — xem direct.test.ts UIScrollView.
+ * @param caseSensitive true = phân biệt hoa thường (pass A: `Text` không dính
+ * `context`, `latest`); false = NOCASE quét rộng (pass B).
+ */
+export async function rgMatchesCase(
+  pattern: string,
+  files: SdkFile[],
+  limit = 200,
+  caseSensitive = false,
+): Promise<RgMatch[]> {
+  if (files.length === 0 || !pattern) return [];
+  const out: RgMatch[] = [];
+  const flags = caseSensitive ? ['-s'] : ['-i'];
+  const run = async (extra: string[]): Promise<string> => {
+    try {
+      const { stdout } = await execFileAsync(
+        'rg',
+        rgArgs(toDirs(files), ['--json', ...flags, '-F', '-m', String(limit), '-e', pattern, ...extra]),
+        { maxBuffer: 64 * 1024 * 1024 },
+      );
+      return stdout;
+    } catch (e: unknown) {
+      if ((e as { code?: number }).code !== 1) throw e;
+      return (e as { stdout?: string }).stdout ?? '';
+    }
+  };
+  const parse = (stdout: string) => {
+    for (const line of stdout.split('\n')) {
+      if (!line.startsWith('{"type":"match"')) continue;
+      try {
+        const j = JSON.parse(line);
+        out.push({
+          file: j.data.path.text,
+          lineNumber: j.data.line_number,
+          lineText: j.data.lines.text.replace(/\n$/, ''),
+        });
+      } catch { /* bỏ dòng json vỡ */ }
+      if (out.length >= limit) break;
+    }
+  };
+  parse(await run([]));
+  return out;
+}
+
+/** rg regex (word-boundary...), còn lại giống rgMatchesCase. */
+export async function rgRegex(
+  pattern: string,
+  files: SdkFile[],
+  limit = 200,
+  caseSensitive = false,
+): Promise<RgMatch[]> {
+  if (files.length === 0 || !pattern) return [];
+  const out: RgMatch[] = [];
+  const flags = caseSensitive ? ['-s'] : ['-i'];
+  try {
+    const { stdout } = await execFileAsync(
+      'rg',
+      rgArgs(toDirs(files), ['--json', ...flags, '-m', String(limit), '-e', pattern]),
+      { maxBuffer: 64 * 1024 * 1024 },
+    );
+    for (const line of stdout.split('\n')) {
+      if (!line.startsWith('{"type":"match"')) continue;
+      try {
+        const j = JSON.parse(line);
+        out.push({
+          file: j.data.path.text,
+          lineNumber: j.data.line_number,
+          lineText: j.data.lines.text.replace(/\n$/, ''),
+        });
+      } catch { /* bỏ */ }
+      if (out.length >= limit) break;
+    }
+  } catch (e: unknown) {
+    if ((e as { code?: number }).code !== 1) throw e;
+    const stdout = (e as { stdout?: string }).stdout ?? '';
+    for (const line of stdout.split('\n')) {
+      if (!line.startsWith('{"type":"match"')) continue;
+      try {
+        const j = JSON.parse(line);
+        out.push({
+          file: j.data.path.text,
+          lineNumber: j.data.line_number,
+          lineText: j.data.lines.text.replace(/\n$/, ''),
+        });
+      } catch { /* bỏ */ }
+    }
+  }
+  return out;
+}
+
 export async function rgMatches(
   pattern: string,
   files: SdkFile[],
@@ -286,6 +420,10 @@ function collectOwnAvail(lines: string[], lineNumber: number): string[] {
       out.unshift(t);
       continue;
     }
+    // Attribute đứng RIÊNG dòng (`@frozen`, `@MainActor`, `@backDeployed(...)`):
+    // xuyên qua, vì @available có thể nằm phía trên nó. Dừng ở dòng trống/code
+    // như cũ nên không hút nhầm @available của decl phía trên.
+    if (/^@[A-Za-z_]\w*(\s*\([^)]*\))?\s*$/.test(t)) continue;
     break;
   }
   return out;
@@ -319,7 +457,11 @@ export function analyzeContext(filePath: string, lineNumber: number, _maxLookbac
   const docParts: string[] = [];
   let inBlock = false;
   let blockBuf: string[] = [];
-  for (let i = lineNumber - 2; i >= Math.max(0, lineNumber - 2 - 15); i--) {
+  // 400 dòng: doc của Apple trong generated interface rất dài (ScrollView ~45
+  // dòng, View modifiers >200 kèm ví dụ code). Giới hạn 15 cũ cắt mất phần
+  // abstract ở ĐẦU doc — phần quan trọng nhất. Vòng lặp vẫn dừng ngay ở dòng
+  // trống/dòng code nên không nuốt doc của decl phía trên.
+  for (let i = lineNumber - 2; i >= Math.max(0, lineNumber - 2 - 400); i--) {
     const raw = lines[i] ?? '';
     const t = raw.trim();
     if (!t) break;

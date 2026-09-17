@@ -1,0 +1,1093 @@
+{
+  "prewarm": {
+    "tool": "prewarm_docs",
+    "args": {
+      "frameworks": [
+        "SwiftUI",
+        "WatchKit",
+        "WidgetKit",
+        "ClockKit",
+        "HealthKit",
+        "WorkoutKit"
+      ],
+      "platform": "watchos"
+    },
+    "elapsedMs": 5238,
+    "bytes": 141,
+    "result": {
+      "cacheDir": "/Users/nguyenluongnam/.cache/ios-sdk-mcp/27A266a",
+      "requested": 5,
+      "generated": 5,
+      "failed": [],
+      "elapsedMs": 3342
+    }
+  },
+  "new_27_SwiftUI": {
+    "tool": "get_new_apis",
+    "args": {
+      "version": "27.0",
+      "framework": "SwiftUI",
+      "platform": "watchos",
+      "limit": 40
+    },
+    "elapsedMs": 96,
+    "bytes": 12813,
+    "result": {
+      "framework": "SwiftUI",
+      "platform": "watchos",
+      "lang": "swift",
+      "filePath": "/Users/nguyenluongnam/.cache/ios-sdk-mcp/27A266a/watchos/SwiftUI/SwiftUI.swift",
+      "count": 40,
+      "apis": [
+        {
+          "name": "AnyNavigationTransition",
+          "kind": "struct",
+          "signature": "public struct AnyNavigationTransition : NavigationTransition, ~Sendable",
+          "introducedIn": 270000,
+          "docComment": "A type-erasing navigation transition that allows for providing any navigation transition value dynamically.",
+          "line": 5954
+        },
+        {
+          "name": "CrossFadeNavigationTransition",
+          "kind": "struct",
+          "signature": "public struct CrossFadeNavigationTransition : NavigationTransition, Sendable",
+          "introducedIn": 270000,
+          "docComment": "A navigation transition that cross-fades between the appearing view and the disappearing view.",
+          "line": 14193
+        },
+        {
+          "name": "ToolbarItemVisibilityPriority",
+          "kind": "struct",
+          "signature": "public struct ToolbarItemVisibilityPriority : Hashable, Sendable",
+          "introducedIn": 270000,
+          "docComment": "A value that defines the visibility priority of a toolbar item.",
+          "line": 69167
+        },
+        {
+          "name": "BorderedTextFieldStyle",
+          "kind": "struct",
+          "signature": "public struct BorderedTextFieldStyle : TextFieldStyle, ~Sendable",
+          "availability": "@available(anyAppleOS 27.0, *)",
+          "docComment": "A text field style with a system-defined border.",
+          "line": 9365
+        },
+        {
+          "name": "GestureInputKinds",
+          "kind": "struct",
+          "signature": "public struct GestureInputKinds : OptionSet, Sendable",
+          "availability": "@available(anyAppleOS 27.0, *)",
+          "docComment": "An option set that specifies which input kinds a gesture should recognize.",
+          "line": 24555
+        },
+        {
+          "name": "PresentationPlacement",
+          "kind": "struct",
+          "signature": "public struct PresentationPlacement : Hashable, Sendable",
+          "availability": "@available(anyAppleOS 27.0, *)",
+          "docComment": "The placement of a presentation within the presenting view.",
+          "line": 42346
+        },
+        {
+          "name": "PreviewDevice",
+          "kind": "struct",
+          "signature": "public struct PreviewDevice : RawRepresentable, ExpressibleByStringLiteral, Sendable",
+          "introducedIn": 130000,
+          "docComment": "A simulator device that runs a preview.",
+          "line": 42704
+        },
+        {
+          "name": "PreviewContext",
+          "kind": "protocol",
+          "signature": "public protocol PreviewContext",
+          "introducedIn": 140000,
+          "docComment": "A context type for use with a preview.",
+          "line": 42658
+        },
+        {
+          "name": "PreviewContextKey",
+          "kind": "protocol",
+          "signature": "public protocol PreviewContextKey",
+          "introducedIn": 140000,
+          "docComment": "A key type for a preview context.",
+          "line": 42670
+        },
+        {
+          "name": "Preview",
+          "kind": "macro",
+          "signature": "@freestanding(declaration) public macro Preview<T>(_ name: String? = nil, traits: PreviewTrait<Preview.ViewTraits>..., arguments: [T], @ContentBuilder body: @escaping @MainActor (T) -> any View) = #externalMacro(module: \"PreviewsMacros\", type: \"SwiftUIViewGroup_1\")",
+          "introducedIn": 180000,
+          "docComment": "Creates a group of previews of a parameterized SwiftUI view, varying its inputs over the provided arguments.",
+          "line": 42601
+        },
+        {
+          "name": "processingTask",
+          "kind": "func",
+          "signature": "public static func processingTask(_ identifier: String) -> BackgroundTask<Void, Void>",
+          "introducedIn": 270000,
+          "docComment": "A task that processes tasks in the background.",
+          "line": 8544
+        },
+        {
+          "name": "reorderable",
+          "kind": "func",
+          "signature": "nonisolated public func reorderable() -> some DynamicViewContent<Self.Data>",
+          "introducedIn": 270000,
+          "docComment": "Enables reordering of views from this content inside the scope of a reorderable container modifier.",
+          "line": 16507
+        },
+        {
+          "name": "reorderable",
+          "kind": "func",
+          "signature": "nonisolated public func reorderable(collectionID: some Hashable & Sendable) -> some DynamicViewContent<Self.Data>",
+          "introducedIn": 270000,
+          "docComment": "Enables reordering views from this content within and between sections in the scope of a reorderable container modifier.",
+          "line": 16554
+        },
+        {
+          "name": "reorderContainer",
+          "kind": "func",
+          "signature": "nonisolated public func reorderContainer<Item>(for item: Item.Type, isEnabled: Bool = true, move: @escaping (_ difference: ReorderDifference<Item.ID, ReorderableSingleCollectionIdentifier>) -> ()) -> some View where Item : Identifiable, Item.ID : Sendable",
+          "introducedIn": 270000,
+          "docComment": "Defines a container of reorderable views.",
+          "line": 76957
+        },
+        {
+          "name": "reorderContainer",
+          "kind": "func",
+          "signature": "nonisolated public func reorderContainer<Item, CollectionID>(for item: Item.Type, in collectionID: CollectionID.Type, isEnabled: Bool = true, move: @escaping (_ difference: ReorderDifference<Item.ID, CollectionID>) -> ()) -> some View where Item : Identifiable, CollectionID : Hashable, CollectionID : Sendable, Item.ID : Sendable",
+          "introducedIn": 270000,
+          "docComment": "Defines a container of reorderable views, with a type you specify to identify sections.",
+          "line": 77017
+        },
+        {
+          "name": "reorderContainer",
+          "kind": "func",
+          "signature": "nonisolated public func reorderContainer<Item, ItemID>(for item: Item.Type, itemID: KeyPath<Item, ItemID>, isEnabled: Bool = true, move: @escaping (_ difference: ReorderDifference<ItemID, ReorderableSingleCollectionIdentifier>) -> ()) -> some View where ItemID : Hashable, ItemID : Sendable",
+          "introducedIn": 270000,
+          "docComment": "Defines a container of reorderable views, with a type and keypath you specify to identify items.",
+          "line": 77074
+        },
+        {
+          "name": "reorderContainer",
+          "kind": "func",
+          "signature": "nonisolated public func reorderContainer<Item, ItemID, CollectionID>(for item: Item.Type, itemID: KeyPath<Item, ItemID>, in collectionID: CollectionID.Type, isEnabled: Bool = true, move: @escaping (_ difference: ReorderDifference<ItemID, CollectionID>) -> ()) -> some View where ItemID : Hashable, ItemID : Sendable, CollectionID : Hashable, CollectionID : Sendable",
+          "introducedIn": 270000,
+          "docComment": "Defines a container of reorderable views, with a type and keypath you use to identify items and a type you use to identify collections.",
+          "line": 77139
+        },
+        {
+          "name": "buildBlock",
+          "kind": "func",
+          "signature": "@export(implementation) public static func buildBlock<each Content>(_ content: repeat each Content) -> TupleContent<repeat each Content>",
+          "introducedIn": 130000,
+          "line": 94935
+        },
+        {
+          "name": "systemPrefersReducedResourceUsage",
+          "kind": "var",
+          "signature": "public var systemPrefersReducedResourceUsage: Bool",
+          "availability": "@available(anyAppleOS 27.0, *)",
+          "docComment": "A boolean value indicating whether the system would prefer the app to reduce its overall resource usage.",
+          "line": 18707
+        },
+        {
+          "name": "Body",
+          "kind": "typealias",
+          "signature": "public typealias Body = Never",
+          "introducedIn": 270000,
+          "docComment": "The type of content representing the body of this toolbar content.",
+          "line": 70251
+        },
+        {
+          "name": "ArrayLiteralElement",
+          "kind": "typealias",
+          "signature": "public typealias ArrayLiteralElement = GestureInputKinds",
+          "availability": "@available(anyAppleOS 27.0, *)",
+          "docComment": "The type of the elements of an array literal.",
+          "line": 24625
+        },
+        {
+          "name": "Element",
+          "kind": "typealias",
+          "signature": "public typealias Element = GestureInputKinds",
+          "availability": "@available(anyAppleOS 27.0, *)",
+          "docComment": "The element type of the option set.",
+          "line": 24632
+        },
+        {
+          "name": "RawValue",
+          "kind": "typealias",
+          "signature": "public typealias RawValue = Int8",
+          "availability": "@available(anyAppleOS 27.0, *)",
+          "docComment": "The raw type that can be used to represent all values of the conforming type.",
+          "line": 24641
+        },
+        {
+          "name": "init",
+          "kind": "init",
+          "signature": "nonisolated public init(request: URLRequest, scale: CGFloat = 1) where Content == Image",
+          "introducedIn": 150000,
+          "docComment": "Loads and displays an image from the specified URL load request.",
+          "line": 6938
+        },
+        {
+          "name": "init",
+          "kind": "init",
+          "signature": "nonisolated public init(request: URLRequest?, scale: CGFloat = 1, transaction: Transaction = Transaction(), @ContentBuilder content: @escaping (AsyncImagePhase) -> Content)",
+          "introducedIn": 150000,
+          "docComment": "Loads and displays a modifiable image from the specified URL load request in phases.",
+          "line": 7018
+        },
+        {
+          "name": "CustomizableToolbarContent",
+          "kind": "extension",
+          "signature": "extension CustomizableToolbarContent",
+          "introducedIn": 270000,
+          "parentType": "CustomizableToolbarContent",
+          "line": 14592
+        },
+        {
+          "name": "EmptyView",
+          "kind": "extension",
+          "signature": "extension EmptyView : ToolbarContent",
+          "introducedIn": 270000,
+          "parentType": "EmptyView",
+          "line": 17775
+        },
+        {
+          "name": "EmptyView",
+          "kind": "extension",
+          "signature": "extension EmptyView : CustomizableToolbarContent",
+          "introducedIn": 270000,
+          "parentType": "EmptyView",
+          "line": 17779
+        },
+        {
+          "name": "NavigationTransition",
+          "kind": "extension",
+          "signature": "extension NavigationTransition where Self == CrossFadeNavigationTransition",
+          "introducedIn": 270000,
+          "parentType": "NavigationTransition",
+          "line": 38780
+        },
+        {
+          "name": "TabContent",
+          "kind": "extension",
+          "signature": "extension TabContent",
+          "introducedIn": 270000,
+          "parentType": "TabContent",
+          "line": 61007
+        },
+        {
+          "name": "ToolbarContent",
+          "kind": "extension",
+          "signature": "extension ToolbarContent",
+          "introducedIn": 270000,
+          "parentType": "ToolbarContent",
+          "line": 68591
+        },
+        {
+          "name": "TupleContent",
+          "kind": "extension",
+          "signature": "extension TupleContent : ToolbarContent where repeat each Content : ToolbarContent",
+          "introducedIn": 270000,
+          "parentType": "TupleContent",
+          "line": 70247
+        },
+        {
+          "name": "TupleContent",
+          "kind": "extension",
+          "signature": "extension TupleContent : CustomizableToolbarContent where repeat each Content : CustomizableToolbarContent",
+          "introducedIn": 270000,
+          "parentType": "TupleContent",
+          "line": 70255
+        },
+        {
+          "name": "TupleContent",
+          "kind": "extension",
+          "signature": "extension TupleContent : AccessibilityRotorContent where repeat each Content : AccessibilityRotorContent",
+          "introducedIn": 270000,
+          "parentType": "TupleContent",
+          "line": 70259
+        },
+        {
+          "name": "View",
+          "kind": "extension",
+          "signature": "extension View",
+          "introducedIn": 270000,
+          "parentType": "View",
+          "line": 82075
+        },
+        {
+          "name": "Optional",
+          "kind": "extension",
+          "signature": "extension Optional : AccessibilityRotorContent where Wrapped : AccessibilityRotorContent",
+          "introducedIn": 270000,
+          "parentType": "Optional",
+          "line": 113562
+        },
+        {
+          "name": "DragGesture",
+          "kind": "extension",
+          "signature": "extension DragGesture",
+          "availability": "@available(anyAppleOS 27.0, *); @available(tvOS, unavailable)",
+          "parentType": "DragGesture",
+          "line": 16226
+        },
+        {
+          "name": "EnvironmentValues",
+          "kind": "extension",
+          "signature": "extension EnvironmentValues",
+          "availability": "@available(anyAppleOS 27.0, *)",
+          "parentType": "EnvironmentValues",
+          "line": 18585
+        },
+        {
+          "name": "GeometryProxy",
+          "kind": "extension",
+          "signature": "extension GeometryProxy",
+          "availability": "@available(anyAppleOS 27.0, *)",
+          "parentType": "GeometryProxy",
+          "line": 24342
+        },
+        {
+          "name": "LongPressGesture",
+          "kind": "extension",
+          "signature": "extension LongPressGesture",
+          "availability": "@available(anyAppleOS 27.0, *); @available(tvOS, unavailable)",
+          "parentType": "LongPressGesture",
+          "line": 34918
+        }
+      ]
+    }
+  },
+  "new_27_WatchKit": {
+    "tool": "get_new_apis",
+    "args": {
+      "version": "27.0",
+      "framework": "WatchKit",
+      "platform": "watchos",
+      "limit": 40
+    },
+    "elapsedMs": 273,
+    "bytes": 30,
+    "result": {
+      "count": 0,
+      "apis": []
+    }
+  },
+  "new_27_WidgetKit": {
+    "tool": "get_new_apis",
+    "args": {
+      "version": "27.0",
+      "framework": "WidgetKit",
+      "platform": "watchos",
+      "limit": 40
+    },
+    "elapsedMs": 30,
+    "bytes": 538,
+    "result": {
+      "framework": "WidgetKit",
+      "platform": "watchos",
+      "lang": "swift",
+      "filePath": "/Users/nguyenluongnam/.cache/ios-sdk-mcp/27A266a/watchos/WidgetKit/WidgetKit.swift",
+      "count": 2,
+      "apis": [
+        {
+          "name": "accessoryCircular",
+          "kind": "case",
+          "signature": "case accessoryCircular",
+          "introducedIn": 140000,
+          "line": 3028
+        },
+        {
+          "name": "accessoryRectangular",
+          "kind": "case",
+          "signature": "case accessoryRectangular",
+          "introducedIn": 140000,
+          "line": 3040
+        }
+      ]
+    }
+  },
+  "new_27_ClockKit": {
+    "tool": "get_new_apis",
+    "args": {
+      "version": "27.0",
+      "framework": "ClockKit",
+      "platform": "watchos",
+      "limit": 40
+    },
+    "elapsedMs": 28,
+    "bytes": 30,
+    "result": {
+      "count": 0,
+      "apis": []
+    }
+  },
+  "new_27_HealthKit": {
+    "tool": "get_new_apis",
+    "args": {
+      "version": "27.0",
+      "framework": "HealthKit",
+      "platform": "watchos",
+      "limit": 40
+    },
+    "elapsedMs": 265,
+    "bytes": 1673,
+    "result": {
+      "framework": "HealthKit",
+      "platform": "watchos",
+      "lang": "swift",
+      "filePath": "/Users/nguyenluongnam/.cache/ios-sdk-mcp/27A266a/watchos/HealthKit/HealthKit.swift",
+      "count": 6,
+      "apis": [
+        {
+          "name": "HKWorkoutZone",
+          "kind": "struct",
+          "signature": "public struct HKWorkoutZone : Sendable",
+          "availability": "@available(anyAppleOS 27.0, *)",
+          "line": 1031
+        },
+        {
+          "name": "HKWorkoutZoneConfiguration",
+          "kind": "struct",
+          "signature": "public struct HKWorkoutZoneConfiguration : Sendable",
+          "availability": "@available(anyAppleOS 27.0, *)",
+          "line": 1044
+        },
+        {
+          "name": "HKWorkoutZoneDuration",
+          "kind": "struct",
+          "signature": "public struct HKWorkoutZoneDuration : Sendable",
+          "availability": "@available(anyAppleOS 27.0, *)",
+          "line": 1143
+        },
+        {
+          "name": "HKWorkoutZoneGroup",
+          "kind": "struct",
+          "signature": "public struct HKWorkoutZoneGroup : Sendable",
+          "availability": "@available(anyAppleOS 27.0, *)",
+          "line": 1153
+        },
+        {
+          "name": "HKWorkoutZoneConfiguration.Source",
+          "kind": "extension",
+          "signature": "extension HKWorkoutZoneConfiguration.Source : Equatable",
+          "availability": "@available(anyAppleOS 27.0, *)",
+          "parentType": "HKWorkoutZoneConfiguration.Source",
+          "line": 1135
+        },
+        {
+          "name": "HKWorkoutZoneConfiguration.Source",
+          "kind": "extension",
+          "signature": "extension HKWorkoutZoneConfiguration.Source : Hashable",
+          "availability": "@available(anyAppleOS 27.0, *)",
+          "parentType": "HKWorkoutZoneConfiguration.Source",
+          "line": 1139
+        }
+      ]
+    }
+  },
+  "new_27_WorkoutKit": {
+    "tool": "get_new_apis",
+    "args": {
+      "version": "27.0",
+      "framework": "WorkoutKit",
+      "platform": "watchos",
+      "limit": 40
+    },
+    "elapsedMs": 30,
+    "bytes": 30,
+    "result": {
+      "count": 0,
+      "apis": []
+    }
+  },
+  "new_27_all": {
+    "tool": "get_new_apis",
+    "args": {
+      "version": "27.0",
+      "platform": "watchos",
+      "limit": 60
+    },
+    "elapsedMs": 305,
+    "bytes": 18743,
+    "result": {
+      "platform": "watchos",
+      "lang": "swift",
+      "files": {
+        "1": "/Applications/Xcode.app/Contents/Developer/Platforms/WatchOS.platform/Developer/SDKs/WatchOS.sdk/System/Library/Frameworks/_MediaPlayer_AppIntents.framework/Modules/_MediaPlayer_AppIntents.swiftmodule/armv7k-apple-watchos.swiftinterface",
+        "2": "/Applications/Xcode.app/Contents/Developer/Platforms/WatchOS.platform/Developer/SDKs/WatchOS.sdk/System/Library/Frameworks/CryptoKit.framework/Modules/CryptoKit.swiftmodule/armv7k-apple-watchos.swiftinterface",
+        "3": "/Applications/Xcode.app/Contents/Developer/Platforms/WatchOS.platform/Developer/SDKs/WatchOS.sdk/System/Library/Frameworks/CoreVideo.framework/Modules/CoreVideo.swiftmodule/armv7k-apple-watchos.swiftinterface"
+      },
+      "count": 60,
+      "apis": [
+        {
+          "name": "MPAppEntityIdentifier",
+          "kind": "class",
+          "framework": "_MediaPlayer_AppIntents",
+          "signature": "@objc(MPAppEntityIdentifier) final public class MPAppEntityIdentifier : ObjectiveC::NSObject, Foundation::NSCopying, Foundation::NSSecureCoding",
+          "file": 1,
+          "line": 13
+        },
+        {
+          "name": "OneTimePrivateKey",
+          "kind": "struct",
+          "framework": "CryptoKit",
+          "signature": "public struct OneTimePrivateKey : CryptoKit::KEMOneTimePrivateKey, ~Swift::Copyable",
+          "introducedIn": 270000,
+          "file": 2,
+          "line": 781
+        },
+        {
+          "name": "CVImageCleanAperture",
+          "kind": "struct",
+          "framework": "CoreVideo",
+          "signature": "@frozen public struct CVImageCleanAperture : Swift::Sendable, Swift::Hashable, CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "file": 3,
+          "line": 71
+        },
+        {
+          "name": "CVImagePixelAspectRatio",
+          "kind": "struct",
+          "framework": "CoreVideo",
+          "signature": "@frozen public struct CVImagePixelAspectRatio : Swift::Sendable, Swift::Hashable, CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "file": 3,
+          "line": 101
+        },
+        {
+          "name": "CVImageChromaField",
+          "kind": "struct",
+          "framework": "CoreVideo",
+          "signature": "public struct CVImageChromaField : Swift::Sendable, CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "file": 3,
+          "line": 163
+        },
+        {
+          "name": "CVImageDisplayMaskRectangle",
+          "kind": "struct",
+          "framework": "CoreVideo",
+          "signature": "public struct CVImageDisplayMaskRectangle : Swift::Sendable, Swift::Hashable, CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "file": 3,
+          "line": 229
+        },
+        {
+          "name": "CVImageStereoDisplayMaskRectangle",
+          "kind": "struct",
+          "framework": "CoreVideo",
+          "signature": "public struct CVImageStereoDisplayMaskRectangle : Swift::Sendable, Swift::Hashable, CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "file": 3,
+          "line": 248
+        },
+        {
+          "name": "CVAttachmentRawValue",
+          "kind": "struct",
+          "framework": "CoreVideo",
+          "signature": "public struct CVAttachmentRawValue : Swift::Equatable, Swift::ExpressibleByDictionaryLiteral",
+          "introducedIn": 270000,
+          "file": 3,
+          "line": 704
+        },
+        {
+          "name": "CVImageFieldDetail",
+          "kind": "enum",
+          "framework": "CoreVideo",
+          "signature": "public enum CVImageFieldDetail : Swift::String, Swift::Sendable, Swift::Hashable, CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "file": 3,
+          "line": 88
+        },
+        {
+          "name": "CVImageYCbCrMatrix",
+          "kind": "enum",
+          "framework": "CoreVideo",
+          "signature": "public enum CVImageYCbCrMatrix : Swift::String, Swift::Sendable, Swift::Hashable, CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "file": 3,
+          "line": 116
+        },
+        {
+          "name": "CVImageColorPrimaries",
+          "kind": "enum",
+          "framework": "CoreVideo",
+          "signature": "public enum CVImageColorPrimaries : Swift::String, Swift::Sendable, Swift::Hashable, CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "file": 3,
+          "line": 129
+        },
+        {
+          "name": "CVImageTransferFunction",
+          "kind": "enum",
+          "framework": "CoreVideo",
+          "signature": "public enum CVImageTransferFunction : Swift::String, Swift::Sendable, Swift::Hashable, CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "file": 3,
+          "line": 145
+        },
+        {
+          "name": "CVImageAlphaChannelMode",
+          "kind": "enum",
+          "framework": "CoreVideo",
+          "signature": "public enum CVImageAlphaChannelMode : Swift::String, Swift::Sendable, Swift::Hashable, CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "file": 3,
+          "line": 207
+        },
+        {
+          "name": "CVImageLogTransferFunction",
+          "kind": "enum",
+          "framework": "CoreVideo",
+          "signature": "public enum CVImageLogTransferFunction : Swift::String, Swift::Sendable, Swift::Hashable, CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "file": 3,
+          "line": 218
+        },
+        {
+          "name": "KEMOneTimePrivateKey",
+          "kind": "protocol",
+          "framework": "CryptoKit",
+          "signature": "@preconcurrency public protocol KEMOneTimePrivateKey : Swift::Sendable, ~Copyable",
+          "introducedIn": 270000,
+          "file": 2,
+          "line": 89
+        },
+        {
+          "name": "CVImageBufferAttachmentKeyDefinitions",
+          "kind": "protocol",
+          "framework": "CoreVideo",
+          "signature": "public protocol CVImageBufferAttachmentKeyDefinitions : CoreVideo::CVAttachmentKeyDefinitions",
+          "introducedIn": 270000,
+          "file": 3,
+          "line": 274
+        },
+        {
+          "name": "CVAttachmentValueRepresentable",
+          "kind": "protocol",
+          "framework": "CoreVideo",
+          "signature": "public protocol CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "file": 3,
+          "line": 699
+        },
+        {
+          "name": "authenticationCode",
+          "kind": "func",
+          "framework": "CryptoKit",
+          "signature": "public static func authenticationCode(for data: Swift::RawSpan, using key: CryptoKit::SymmetricKey) -> CryptoKit::HMAC<H>.CryptoKit::MAC",
+          "introducedIn": 130000,
+          "file": 2,
+          "line": 140
+        },
+        {
+          "name": "update",
+          "kind": "func",
+          "framework": "CryptoKit",
+          "signature": "public mutating func update(bytes: Swift::RawSpan)",
+          "introducedIn": 130000,
+          "file": 2,
+          "line": 146
+        },
+        {
+          "name": "deriveKey",
+          "kind": "func",
+          "framework": "CryptoKit",
+          "signature": "public static func deriveKey(inputKeyMaterial: CryptoKit::SymmetricKey, salt: Swift::RawSpan? = nil, info: Swift::RawSpan? = nil, output outputKey: inout Swift::OutputRawSpan)",
+          "introducedIn": 140000,
+          "file": 2,
+          "line": 286
+        },
+        {
+          "name": "extract",
+          "kind": "func",
+          "framework": "CryptoKit",
+          "signature": "public static func extract(inputKeyMaterial: CryptoKit::SymmetricKey, salt: Swift::RawSpan?) -> CryptoKit::HashedAuthenticationCode<H>",
+          "introducedIn": 140000,
+          "file": 2,
+          "line": 298
+        },
+        {
+          "name": "expand",
+          "kind": "func",
+          "framework": "CryptoKit",
+          "signature": "public static func expand(pseudoRandomKey prk: Swift::RawSpan, info: Swift::RawSpan?, into output: inout Swift::OutputRawSpan)",
+          "introducedIn": 140000,
+          "file": 2,
+          "line": 302
+        },
+        {
+          "name": "seal",
+          "kind": "func",
+          "framework": "CryptoKit",
+          "signature": "public static func seal(inPlace message: inout Swift::MutableRawSpan, using key: CryptoKit::SymmetricKey, nonce: CryptoKit::ChaChaPoly.CryptoKit::Nonce, authenticating authenticatedData: Swift::RawSpan? = nil, tag: inout Swift::OutputRawSpan) throws",
+          "introducedIn": 130000,
+          "file": 2,
+          "line": 358
+        },
+        {
+          "name": "open",
+          "kind": "func",
+          "framework": "CryptoKit",
+          "signature": "public static func open(inPlace message: inout Swift::MutableRawSpan, using key: CryptoKit::SymmetricKey, nonce: CryptoKit::ChaChaPoly.CryptoKit::Nonce, authenticating authenticatedData: Swift::RawSpan? = nil, tag: Swift::RawSpan) throws",
+          "introducedIn": 130000,
+          "file": 2,
+          "line": 362
+        },
+        {
+          "name": "seal",
+          "kind": "func",
+          "framework": "CryptoKit",
+          "signature": "public static func seal(inPlace message: inout Swift::MutableRawSpan, using key: CryptoKit::SymmetricKey, nonce: CryptoKit::AES.CryptoKit::GCM.CryptoKit::Nonce, authenticating authenticatedData: Swift::RawSpan? = nil, tag: inout Swift::OutputRawSpan) throws",
+          "introducedIn": 270000,
+          "file": 2,
+          "line": 492
+        },
+        {
+          "name": "open",
+          "kind": "func",
+          "framework": "CryptoKit",
+          "signature": "public static func open(inPlace message: inout Swift::MutableRawSpan, using key: CryptoKit::SymmetricKey, nonce: CryptoKit::AES.CryptoKit::GCM.CryptoKit::Nonce, authenticating authenticatedData: Swift::RawSpan? = nil, tag: Swift::RawSpan) throws",
+          "introducedIn": 270000,
+          "file": 2,
+          "line": 496
+        },
+        {
+          "name": "bytes",
+          "kind": "var",
+          "framework": "CryptoKit",
+          "signature": "public var bytes: Swift::RawSpan",
+          "introducedIn": 130000,
+          "file": 2,
+          "line": 414
+        },
+        {
+          "name": "PublicKey",
+          "kind": "typealias",
+          "framework": "CryptoKit",
+          "signature": "public typealias PublicKey = CryptoKit::XWingMLKEM768X25519.CryptoKit::PublicKey",
+          "introducedIn": 270000,
+          "file": 2,
+          "line": 788
+        },
+        {
+          "name": "PublicKey",
+          "kind": "typealias",
+          "framework": "CryptoKit",
+          "signature": "public typealias PublicKey = CryptoKit::MLKEM768.CryptoKit::PublicKey",
+          "introducedIn": 270000,
+          "file": 2,
+          "line": 950
+        },
+        {
+          "name": "PublicKey",
+          "kind": "typealias",
+          "framework": "CryptoKit",
+          "signature": "public typealias PublicKey = CryptoKit::MLKEM1024.CryptoKit::PublicKey",
+          "introducedIn": 270000,
+          "file": 2,
+          "line": 992
+        },
+        {
+          "name": "RawValue",
+          "kind": "typealias",
+          "framework": "CoreVideo",
+          "signature": "public typealias RawValue = Swift::String",
+          "introducedIn": 270000,
+          "file": 3,
+          "line": 98
+        },
+        {
+          "name": "Key",
+          "kind": "typealias",
+          "framework": "CoreVideo",
+          "signature": "public typealias Key = Swift::String",
+          "introducedIn": 270000,
+          "file": 3,
+          "line": 713
+        },
+        {
+          "name": "Value",
+          "kind": "typealias",
+          "framework": "CoreVideo",
+          "signature": "public typealias Value = (any CoreVideo::CVAttachmentValueRepresentable)?",
+          "introducedIn": 270000,
+          "file": 3,
+          "line": 715
+        },
+        {
+          "name": "init",
+          "kind": "init",
+          "framework": "CryptoKit",
+          "signature": "public init(copyingWithZeroing bytes: inout Swift::MutableRawSpan)",
+          "introducedIn": 130000,
+          "file": 2,
+          "line": 429
+        },
+        {
+          "name": "init",
+          "kind": "init",
+          "framework": "CryptoKit",
+          "signature": "public init(copying bytes: Swift::RawSpan) throws",
+          "introducedIn": 130000,
+          "file": 2,
+          "line": 1001
+        },
+        {
+          "name": "CoreVideo",
+          "kind": "extension",
+          "framework": "CoreVideo",
+          "signature": "extension CoreVideo::CVImageBufferAttachmentKeyDefinitions",
+          "introducedIn": 270000,
+          "parentType": "CoreVideo",
+          "file": 3,
+          "line": 277
+        },
+        {
+          "name": "CoreVideo",
+          "kind": "extension",
+          "framework": "CoreVideo",
+          "signature": "extension CoreVideo::CVMutablePixelBuffer",
+          "introducedIn": 270000,
+          "parentType": "CoreVideo",
+          "file": 3,
+          "line": 685
+        },
+        {
+          "name": "Swift",
+          "kind": "extension",
+          "framework": "CoreVideo",
+          "signature": "extension Swift::RawRepresentable where Self.RawValue : CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "parentType": "Swift",
+          "file": 3,
+          "line": 718
+        },
+        {
+          "name": "CoreGraphics",
+          "kind": "extension",
+          "framework": "CoreVideo",
+          "signature": "extension CoreGraphics::CGColorSpace : CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "parentType": "CoreGraphics",
+          "file": 3,
+          "line": 725
+        },
+        {
+          "name": "CoreFoundation",
+          "kind": "extension",
+          "framework": "CoreVideo",
+          "signature": "extension CoreFoundation::CGSize : CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "parentType": "CoreFoundation",
+          "file": 3,
+          "line": 728
+        },
+        {
+          "name": "CoreFoundation",
+          "kind": "extension",
+          "framework": "CoreVideo",
+          "signature": "extension CoreFoundation::CGRect : CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "parentType": "CoreFoundation",
+          "file": 3,
+          "line": 735
+        },
+        {
+          "name": "Swift",
+          "kind": "extension",
+          "framework": "CoreVideo",
+          "signature": "extension Swift::Array : CoreVideo::CVAttachmentValueRepresentable where Element : CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "parentType": "Swift",
+          "file": 3,
+          "line": 742
+        },
+        {
+          "name": "Swift",
+          "kind": "extension",
+          "framework": "CoreVideo",
+          "signature": "extension Swift::Set : CoreVideo::CVAttachmentValueRepresentable where Element : CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "parentType": "Swift",
+          "file": 3,
+          "line": 749
+        },
+        {
+          "name": "Swift",
+          "kind": "extension",
+          "framework": "CoreVideo",
+          "signature": "extension Swift::Dictionary : CoreVideo::CVAttachmentValueRepresentable where Key : CoreVideo::CVAttachmentValueRepresentable, Value : CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "parentType": "Swift",
+          "file": 3,
+          "line": 756
+        },
+        {
+          "name": "Swift",
+          "kind": "extension",
+          "framework": "CoreVideo",
+          "signature": "extension Swift::Bool : CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "parentType": "Swift",
+          "file": 3,
+          "line": 763
+        },
+        {
+          "name": "Swift",
+          "kind": "extension",
+          "framework": "CoreVideo",
+          "signature": "extension Swift::Int : CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "parentType": "Swift",
+          "file": 3,
+          "line": 766
+        },
+        {
+          "name": "Swift",
+          "kind": "extension",
+          "framework": "CoreVideo",
+          "signature": "extension Swift::Int8 : CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "parentType": "Swift",
+          "file": 3,
+          "line": 769
+        },
+        {
+          "name": "Swift",
+          "kind": "extension",
+          "framework": "CoreVideo",
+          "signature": "extension Swift::Int16 : CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "parentType": "Swift",
+          "file": 3,
+          "line": 772
+        },
+        {
+          "name": "Swift",
+          "kind": "extension",
+          "framework": "CoreVideo",
+          "signature": "extension Swift::Int32 : CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "parentType": "Swift",
+          "file": 3,
+          "line": 775
+        },
+        {
+          "name": "Swift",
+          "kind": "extension",
+          "framework": "CoreVideo",
+          "signature": "extension Swift::Int64 : CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "parentType": "Swift",
+          "file": 3,
+          "line": 778
+        },
+        {
+          "name": "Swift",
+          "kind": "extension",
+          "framework": "CoreVideo",
+          "signature": "extension Swift::UInt : CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "parentType": "Swift",
+          "file": 3,
+          "line": 781
+        },
+        {
+          "name": "Swift",
+          "kind": "extension",
+          "framework": "CoreVideo",
+          "signature": "extension Swift::UInt8 : CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "parentType": "Swift",
+          "file": 3,
+          "line": 784
+        },
+        {
+          "name": "Swift",
+          "kind": "extension",
+          "framework": "CoreVideo",
+          "signature": "extension Swift::UInt16 : CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "parentType": "Swift",
+          "file": 3,
+          "line": 787
+        },
+        {
+          "name": "Swift",
+          "kind": "extension",
+          "framework": "CoreVideo",
+          "signature": "extension Swift::UInt32 : CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "parentType": "Swift",
+          "file": 3,
+          "line": 790
+        },
+        {
+          "name": "Swift",
+          "kind": "extension",
+          "framework": "CoreVideo",
+          "signature": "extension Swift::UInt64 : CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "parentType": "Swift",
+          "file": 3,
+          "line": 793
+        },
+        {
+          "name": "Swift",
+          "kind": "extension",
+          "framework": "CoreVideo",
+          "signature": "extension Swift::Float : CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "parentType": "Swift",
+          "file": 3,
+          "line": 796
+        },
+        {
+          "name": "Swift",
+          "kind": "extension",
+          "framework": "CoreVideo",
+          "signature": "extension Swift::Double : CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "parentType": "Swift",
+          "file": 3,
+          "line": 799
+        },
+        {
+          "name": "CoreFoundation",
+          "kind": "extension",
+          "framework": "CoreVideo",
+          "signature": "extension CoreFoundation::CGFloat : CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "parentType": "CoreFoundation",
+          "file": 3,
+          "line": 802
+        },
+        {
+          "name": "Foundation",
+          "kind": "extension",
+          "framework": "CoreVideo",
+          "signature": "extension Foundation::URL : CoreVideo::CVAttachmentValueRepresentable",
+          "introducedIn": 270000,
+          "parentType": "Foundation",
+          "file": 3,
+          "line": 805
+        },
+        {
+          "name": "_MediaPlayer_AppIntents",
+          "kind": "extension",
+          "framework": "_MediaPlayer_AppIntents",
+          "signature": "extension _MediaPlayer_AppIntents::MPAppEntityIdentifier",
+          "introducedIn": 270000,
+          "parentType": "_MediaPlayer_AppIntents",
+          "file": 1,
+          "line": 30
+        }
+      ]
+    }
+  }
+}

@@ -14,11 +14,25 @@ import {
   type SdkFile,
 } from './sdk.js';
 import { convertLine, objcLineMap, rankHits, type ConvertedHit } from './convert.js';
+import {
+  ensureIface,
+  ensureIfacesFor,
+  withCachedIfaces,
+  isCachePath,
+  cacheRoot,
+} from './iface.js';
+import {
+  packList,
+  packMembers,
+  trimAvailability,
+  declFromMarker,
+  isRealDeprecation,
+} from './pack.js';
 import type { SdkPlatform } from './types.js';
 
 const server = new McpServer({
   name: 'ios-sdk-mcp',
-  version: '0.4.0',
+  version: '0.5.0',
 });
 
 const platformDesc =
@@ -39,7 +53,103 @@ function filesFor(framework?: string, platform?: string): SdkFile[] {
     const fw = framework.toLowerCase();
     files = files.filter((f) => f.framework.toLowerCase() === fw);
   }
-  return files;
+  // Framework nào đã có generated interface trong cache thì đọc bản ĐÓ thay cho
+  // .swiftinterface: cùng decl nhưng kèm doc comment. Chỉ dùng cache sẵn có,
+  // không sinh mới ở đây (search rộng phải nhanh).
+  return withCachedIfaces(files);
+}
+
+/** Như filesFor nhưng SINH generated interface cho framework được chỉ định.
+ * Dùng cho các tool trả tài liệu (detail/members) — chịu ~1-3s lần đầu/module. */
+async function filesForDocs(framework?: string, platform?: string): Promise<SdkFile[]> {
+  const base = discoverFiles(platsArg(platform));
+  if (framework) {
+    const fw = framework.toLowerCase();
+    const mine = base.filter((f) => f.framework.toLowerCase() === fw);
+    const plats = new Set(mine.filter((f) => f.lang === 'swift').map((f) => f.platform));
+    const real = mine.find((f) => f.lang === 'swift')?.framework ?? framework;
+    await Promise.all([...plats].map((p) => ensureIface(real, p)));
+    return withCachedIfaces(mine);
+  }
+  return withCachedIfaces(base);
+}
+
+/**
+ * Rút doc xuống ABSTRACT (đoạn đầu, tới dòng trống đầu tiên) cho các tool trả
+ * DANH SÁCH. Doc Apple dài 2-6KB/symbol: 20 hit × full doc là ~50KB JSON, ngập
+ * context của agent mà không giúp chọn API. get_api_detail vẫn trả full.
+ */
+function abstractOf(doc: string | undefined, max = 240): string | undefined {
+  if (!doc) return undefined;
+  const first = doc.split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim();
+  if (!first) return undefined;
+  return first.length > max ? `${first.slice(0, max - 1)}…` : first;
+}
+
+function withAbstract<T extends { docComment?: string }>(h: T): T {
+  const a = abstractOf(h.docComment);
+  return a ? { ...h, docComment: a } : h;
+}
+
+/** Regex bắt DÒNG KHAI BÁO của 1 tên (Swift + ObjC), dùng cho locate.
+ * `rgMatches(" Name")` cũ chỉ lấy 60 match thô: với tên phổ biến (`Text`) 60
+ * match đầu toàn comment/param nên trượt hết dòng decl -> "not found". */
+function declRegex(name: string): string {
+  const esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const kw = 'struct|class|enum|protocol|actor|typealias|macro|func|var|let|extension';
+  return `(\\b(${kw})|@(interface|protocol))\\s+${esc}\\b`;
+}
+
+/** Locate decl của `name`: decl-anchored trước, fallback substring cũ. */
+async function locateDecl(
+  name: string,
+  files: SdkFile[],
+  byPath: Map<string, SdkFile>,
+): Promise<ConvertedHit[]> {
+  const { rgRegex } = await import('./sdk.js');
+  const short = name.includes('.') ? name.split('.').pop()! : name;
+  const keep = (h: ConvertedHit) =>
+    h.name === name || h.name === short || h.name.endsWith(`.${short}`);
+  let cands = toHits(await rgRegex(declRegex(short), files, 200, true), byPath, 200).filter(keep);
+  if (cands.length === 0) {
+    cands = toHits(await rgMatches(` ${short}`, files, 60), byPath, 60).filter(keep);
+  }
+  return cands;
+}
+
+/**
+ * Nâng 1 hit lên bản CÓ DOC: sinh generated interface của framework rồi tìm lại
+ * đúng decl trong đó. Trả null nếu module không sinh được (ObjC-only...) hoặc
+ * không tìm thấy decl tương ứng — caller giữ hit cũ.
+ */
+async function withDocs(top: ConvertedHit): Promise<ConvertedHit | null> {
+  if (top.lang !== 'swift') return null;
+  if (isCachePath(top.filePath)) return null; // đã là generated interface
+  const p = await ensureIface(top.framework, top.platform);
+  if (!p) return null;
+  const { fileLines } = await import('./sdk.js');
+  let lines: string[];
+  try {
+    lines = fileLines(p);
+  } catch {
+    return null;
+  }
+  const file: SdkFile = {
+    path: p, framework: top.framework, platform: top.platform, lang: 'swift',
+  };
+  const short = top.name.split('.').pop()!;
+  let fallback: ConvertedHit | null = null;
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i] ?? '';
+    // Rẻ trước, convert sau: file 140k dòng, convertLine mỗi dòng quá đắt.
+    if (!raw.includes(short)) continue;
+    const hit = convertLine(file, i + 1, raw);
+    if (!hit) continue;
+    if (hit.name !== top.name && hit.name !== short) continue;
+    if (hit.kind === top.kind) return hit;
+    if (!fallback) fallback = hit;
+  }
+  return fallback;
 }
 
 function readFile(p: string): string {
@@ -64,6 +174,7 @@ function toHits(
   limit: number,
 ): ConvertedHit[] {
   const out: ConvertedHit[] = [];
+  const seen = new Set<string>(); // dedup cross-platform: cùng API 5 SDK -> 1 hit
   for (const m of matches) {
     if (out.length >= limit) break;
     const file = filesByPath.get(m.file);
@@ -72,7 +183,13 @@ function toHits(
       file.lang === 'objc'
         ? convertLine(file, m.lineNumber, m.lineText, objcMapFor(file))
         : convertLine(file, m.lineNumber, m.lineText);
-    if (hit) out.push(hit);
+    if (!hit) continue;
+    // Key dedup: name+kind+framework+signature (khác parent/signature = API khác).
+    // Platform giữ lại ở hit đầu (phase sau gộp platforms nếu cần).
+    const k = `${hit.kind}:${hit.name}@${hit.framework}:${hit.signature}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(hit);
   }
   return out;
 }
@@ -203,6 +320,58 @@ export async function readScopeMembers(
   return out.slice(0, 20);
 }
 
+/**
+ * Members khai báo trong `extension <Type>` khắp file (Swift).
+ * readScopeMembers chỉ đọc block của chính decl; với type Swift thì đó mới là
+ * phần nhỏ — modifiers/tiện ích của Apple nằm ở extension.
+ */
+export async function readExtensionMembers(
+  type: ConvertedHit,
+  includeInternal: boolean,
+  limit = 200,
+): Promise<ConvertedHit[]> {
+  const { fileLines } = await import('./sdk.js');
+  let lines: string[];
+  try {
+    lines = fileLines(type.filePath);
+  } catch {
+    return [];
+  }
+  const short = type.name.split('.').pop()!;
+  const file: SdkFile = {
+    path: type.filePath, framework: type.framework, platform: type.platform, lang: type.lang,
+  };
+  const out: ConvertedHit[] = [];
+  for (let i = 0; i < lines.length && out.length < limit; i++) {
+    const t = (lines[i] ?? '').trim();
+    const m = t.match(/^extension\s+([^\s:{]+)/);
+    if (!m) continue;
+    const en = m[1].replace(/<.*>$/, '');
+    if (en !== type.name && en !== short && !en.endsWith(`.${short}`)) continue;
+    let d = 0;
+    for (let j = i; j < lines.length && out.length < limit; j++) {
+      const raw = lines[j] ?? '';
+      const noStr = raw.replace(/"(?:[^"\\]|\\.)*"/g, '""');
+      const opens = (noStr.match(/\{/g) || []).length;
+      const closes = (noStr.match(/\}/g) || []).length;
+      // Convert TRƯỚC khi cộng brace của dòng hiện tại (dòng `public func x() {`
+      // vừa khai báo member vừa mở scope con).
+      if (j > i && d === 1 && !/^(get|set|willSet|didSet)\b/.test(raw.trim())) {
+        const h = convertLine(file, j + 1, raw);
+        if (h && h.kind !== 'extension' && (includeInternal || !h.name.startsWith('_'))) {
+          out.push({ ...h, parentType: type.name });
+        }
+      }
+      d += opens - closes;
+      if (j > i && d <= 0) {
+        i = j; // nhảy qua block đã đọc
+        break;
+      }
+    }
+  }
+  return out;
+}
+
 // --- search_apis: rg trực tiếp + convert ------------------------------------
 server.tool(
   'search_apis',
@@ -213,30 +382,111 @@ server.tool(
     kind: z.string().optional().describe('Filter by kind: class, struct, enum, protocol, func, var, macro, typealias, case, init, operator'),
     platform: z.string().optional().describe(platformDesc),
     limit: z.number().optional().describe('Max results (default 20, max 100)'),
+    verbose: z.boolean().optional().describe('Return full fields without hoisting/compaction (default false)'),
   },
-  async ({ query, framework, kind, platform, limit }) => {
+  async ({ query, framework, kind, platform, limit, verbose }) => {
     const files = filesFor(framework, platform);
     const toks = tokenize(query);
     if (toks.length === 0) {
       return { content: [{ type: 'text', text: 'Empty query (need >=2 alphanumerics per token).' }] };
     }
-    // Phase 1: token dài nhất (selective nhất) để lấy candidates nhanh.
-    const main = [...toks].sort((a, b) => b.length - a.length)[0];
-    const rest = toks.filter((t) => t !== main);
+    // Phase 1 (3-pass, dừng sớm khi đủ decl tốt — pull() đếm THẬT bằng
+    // convertLine, không heuristic). Rẻ vì dừng ở pass A cho query tốt.
+    // A. Decl-anchored case-sensitive (`struct Text`, `@interface Foo`):
+    //    trúng dòng khai báo, không dính comment/param. ~300ms toàn corpus.
+    // B. Word-boundary (`\bText\b`): thêm `TextField` dùng từ Text...
+    // C. Substring + NOCASE: vét khi thiếu (lowercase query, framework lạ).
     const n = Math.min(Math.max(limit ?? 20, 1), 100);
-    const matches = await rgMatches(main, files, Math.min(n * 10, 500));
+    const rawToks = query.split(/[^A-Za-z0-9_]+/).filter((t) => t.length >= 2);
+    const mainRaw = [...rawToks].sort((a, b) => b.length - a.length)[0] ?? toks[0];
+    const rest = toks.filter((t) => t !== mainRaw.toLowerCase());
+    const { rgMatchesCase, rgRegex } = await import('./sdk.js');
+    const { convertLine: convertEarly } = await import('./convert.js');
+    const byPathEarly = filesByPath(files);
+    // wantConvertOK: dừng pass khi convertOK (KHÔNG underscore) đạt ngưỡng.
+    // BUG ĐÃ GẶP: floor 12 + decl-anchored pass A cho `Text` ra 27 matches
+    // nhưng chỉ 15 convertOK (12 còn lại là `struct Text` ở platform khác bị
+    // dedup? không — countConvertOK đếm TRƯỚC dedup nên 27 matches -> 27 OK?)
+    // Thực tế debug: pass A 27 matches, conv=27, exact=27 -> stop đúng.
+    // Nếu MCP vẫn ra rác => pull chain đã chạy thêm pass B/C/D (xem log).
+    // TẠM: nới -m pass A lên 200, floor theo n để ít pass hơn.
+    const wantConvertOK = Math.max(n * 5, 20);
+    const seen = new Set<string>();
+    let matches: { file: string; lineNumber: number; lineText: string }[] = [];
+    // Đếm THẬT bằng convertLine (rẻ ~5ms/300 matches): dừng khi đủ decl tốt.
+    // Đếm regex heuristic trước đây sai (comment `Text combine` cũng tính).
+    const countConvertOK = (
+      ms: { file: string; lineNumber: number; lineText: string }[],
+    ): number => {
+      let c = 0;
+      for (const m of ms) {
+        const file = byPathEarly.get(m.file);
+        if (!file) continue;
+        const h = file.lang === 'objc'
+          ? convertEarly(file, m.lineNumber, m.lineText, objcMapFor(file))
+          : convertEarly(file, m.lineNumber, m.lineText);
+        if (h && !h.name.startsWith('_')) c++;
+      }
+      return c;
+    };
+    const pull = async (
+      fn: () => Promise<{ file: string; lineNumber: number; lineText: string }[]>,
+    ): Promise<boolean> => {
+      // true = đã đủ decl tốt, dừng.
+      if (countConvertOK(matches) >= wantConvertOK) return true;
+      for (const m of await fn()) {
+        const k = `${m.file}:${m.lineNumber}`;
+        if (!seen.has(k)) {
+          seen.add(k);
+          matches.push(m);
+        }
+      }
+      return countConvertOK(matches) >= wantConvertOK;
+    };
+    // Pass A: decl-anchored regex — trúng thẳng dòng khai báo (`struct Text`,
+    // `@interface Foo`), không dính comment (`Text combine...`) hay param
+    // (`valueDescription: Text`). Rẻ (~10-30ms).
+    const esc = mainRaw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const declPat = `(struct|class|enum|protocol|actor|func|var|let|init|typealias|associatedtype|macro|@interface|@protocol|@property)\s+${esc}\\b`;
+    const debugLog = (...a: unknown[]) => {
+      if (process.env.IOS_DEBUG) console.error('[search]', ...a);
+    };
+    const pullLogged = async (
+      label: string,
+      fn: () => Promise<{ file: string; lineNumber: number; lineText: string }[]>,
+    ): Promise<boolean> => {
+      const r = await pull(fn);
+      debugLog(`pass ${label}: stop=${r} matches=${matches.length}`);
+      return r;
+    };
+    if (!(await pullLogged('A-decl', () => rgRegex(declPat, files, 200, true)))) {
+      if (!(await pullLogged('B-word', () => rgRegex(`\\b${esc}\\b`, files, 200, true)))) {
+        if (!(await pullLogged('C-sub', () => rgMatchesCase(mainRaw, files, 400, true)))) {
+          await pullLogged('D-nocase', () => rgMatchesCase(mainRaw.toLowerCase(), files, 400, false));
+        }
+      }
+    }
+    const main = mainRaw;
     const byPath = filesByPath(files);
-    let hits = toHits(matches, byPath, n * 5);
-    // Phase 2: các token còn lại phải khớp cùng dòng HOẶC cùng file context.
-    if (rest.length > 0) {
+    // Rank trên toàn bộ matches rồi mới slice.
+    let hits = toHits(matches, byPath, matches.length);
+    // Phase 2 (multi-word recall): token còn lại phải khớp name/signature.
+    // Với query 1 từ, rest rỗng NHƯNG vẫn phải loại row rác: row mà query chỉ
+    // xuất hiện trong params/body signature (VD `value: Text` param) mà name
+    // không chứa query -> loại. Đây là chỗ `value@Charts` lọt top `Text`.
+    {
+      const q = main.toLowerCase();
       hits = hits.filter((h) => {
         const hay = `${h.name} ${h.signature} ${h.parentType ?? ''}`.toLowerCase();
-        return rest.every((t) => hay.includes(t));
+        if (!hay.includes(q)) return false;
+        if (rest.length > 0 && !rest.every((t) => hay.includes(t))) return false;
+        return true;
       });
     }
     if (kind) hits = hits.filter((h) => h.kind === kind);
-    hits = rankHits(hits, query).slice(0, n);
-    return { content: [{ type: 'text', text: JSON.stringify(hits, null, 2) }] };
+    hits = rankHits(hits, query).slice(0, n).map(withAbstract);
+    const packed = packList(hits, verbose ?? false);
+    return { content: [{ type: 'text', text: JSON.stringify(packed, null, 2) }] };
   },
 );
 
@@ -249,21 +499,20 @@ server.tool(
     framework: z.string().optional().describe('Framework name for disambiguation'),
     include_internal: z.boolean().optional().describe('Include internal _-prefixed members (default false)'),
     platform: z.string().optional().describe(platformDesc),
+    verbose: z.boolean().optional().describe('Return full fields without hoisting/compaction (default false)'),
   },
-  async ({ name, framework, include_internal, platform }) => {
-    const files = filesFor(framework, platform);
-    // Locate: ưu tiên decl line (`struct Name`, `@interface Name`, `func Name`...)
-    const declPat = ` ${name}`;
-    const matches = await rgMatches(declPat, files, 60);
+  async ({ name, framework, include_internal, platform, verbose }) => {
+    const files = await filesForDocs(framework, platform);
     const byPath = filesByPath(files);
-    const cands = toHits(matches, byPath, 60).filter(
-      (h) => h.name === name || h.name.endsWith(`.${name}`),
-    );
+    const cands = await locateDecl(name, files, byPath);
     if (cands.length === 0) {
       return { content: [{ type: 'text', text: `API "${name}" not found` }] };
     }
     const ranked = rankHits(cands, name);
-    const top = ranked[0];
+    // Không truyền framework -> files vẫn là .swiftinterface (không doc).
+    // Biết framework của top rồi thì sinh generated interface và dùng bản đó:
+    // doc comment + members đều lấy từ nguồn có tài liệu.
+    const top = (await withDocs(ranked[0])) ?? ranked[0];
     const ctx = analyzeContext(top.filePath, top.lineNumber);
     const detail = {
       ...top,
@@ -279,8 +528,13 @@ server.tool(
     // Tìm dòng mở scope chứa top.lineNumber: đi ngược tìm `struct/class/enum X {`
     // hoặc `extension ...Name... {` gần nhất, rồi đọc tới `}` cân bằng.
     const members = await readScopeMembers(top, include_internal ?? false);
+    // Member kế thừa framework/platform/lang/file/availability của cha -> bỏ
+    // (xem packMembers). `memberCount` bỏ luôn: đã là members.length.
+    const body = verbose
+      ? { ...detail, members, memberCount: members.length }
+      : { ...trimAvailability(detail), members: packMembers(detail, members, false) };
     return {
-      content: [{ type: 'text', text: JSON.stringify({ ...detail, members, memberCount: members.length }, null, 2) }],
+      content: [{ type: 'text', text: JSON.stringify(body, null, 2) }],
     };
   },
 );
@@ -294,21 +548,21 @@ server.tool(
     framework: z.string().optional().describe('Filter by framework'),
     include_internal: z.boolean().optional().describe('Include internal _-prefixed Apple APIs (default false)'),
     platform: z.string().optional().describe(platformDesc),
+    verbose: z.boolean().optional().describe('Return full fields without hoisting/compaction (default false)'),
   },
-  async ({ name, framework, include_internal, platform }) => {
-    const files = filesFor(framework, platform);
+  async ({ name, framework, include_internal, platform, verbose }) => {
+    const files = await filesForDocs(framework, platform);
     const short = name.includes('.') ? name.split('.').pop()! : name;
     // Tìm type decl trước để lấy đúng file chứa nó (tránh rg 400 dòng rác từ
     // các file khác rồi lọc parentType — convertLine không gắn parent cho
     // member (chỉ parser full-file mới biết scope), nên lọc parentType rỗng).
-    const declMatches = await rgMatches(short, files, 60);
     const byPath = filesByPath(files);
-    const decls = toHits(declMatches, byPath, 60).filter(
-      (h) => h.name === short || h.name === name || h.name.endsWith(`.${short}`),
-    );
-    const typeDecl = rankHits(decls, short).find((h) =>
+    const decls = await locateDecl(name, files, byPath);
+    const typeDeclRaw = rankHits(decls, short).find((h) =>
       ['struct', 'class', 'enum', 'protocol'].includes(h.kind),
     ) ?? rankHits(decls, short)[0];
+    // Đọc members từ generated interface -> mỗi member kèm doc comment của nó.
+    const typeDecl = typeDeclRaw ? ((await withDocs(typeDeclRaw)) ?? typeDeclRaw) : typeDeclRaw;
     let members: ConvertedHit[] = [];
     if (typeDecl) {
       members = await readScopeMembers(typeDecl, include_internal ?? false);
@@ -320,6 +574,12 @@ server.tool(
       members = toHits(matches, byPath, 400).filter(
         (h) => h.parentType === name || h.parentType === short || h.parentType?.endsWith(`.${short}`),
       );
+    }
+    // Type Swift: phần lớn API nằm trong `extension X { ... }` rải khắp file
+    // (Text có ~10 member trong body nhưng hàng trăm modifier ở extension).
+    // Đọc scope của decl thôi là bỏ sót gần hết -> gom thêm các extension cùng tên.
+    if (typeDecl && typeDecl.lang === 'swift') {
+      members = members.concat(await readExtensionMembers(typeDecl, include_internal ?? false));
     }
     members = members
       .filter((h) => (include_internal ? true : !h.name.startsWith('_')))
@@ -334,7 +594,22 @@ server.tool(
       seen.add(k);
       return true;
     });
-    return { content: [{ type: 'text', text: JSON.stringify(rankHits(deduped, name).slice(0, 200), null, 2) }] };
+    const out = rankHits(deduped, name).slice(0, 200).map(withAbstract);
+    if (verbose) {
+      return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }] };
+    }
+    // Header mang field chung của type; member chỉ giữ phần riêng.
+    const head = typeDecl ?? out[0];
+    const body = {
+      type: head.name,
+      framework: head.framework,
+      platform: head.platform,
+      lang: head.lang,
+      filePath: head.filePath,
+      count: out.length,
+      members: packMembers(head, out, false),
+    };
+    return { content: [{ type: 'text', text: JSON.stringify(body, null, 2) }] };
   },
 );
 
@@ -349,7 +624,8 @@ server.tool(
     after: z.number().optional().describe('Lines after (default 15, max 60)'),
   },
   async ({ file, line, before, after }) => {
-    if (!file.startsWith('/Applications/Xcode.app/')) {
+    // Cho phép cả cache generated-interface (filePath của hit có doc trỏ vào đó).
+    if (!file.startsWith('/Applications/Xcode.app/') && !isCachePath(file)) {
       return { content: [{ type: 'text', text: 'Refusing to read outside Xcode.app SDKs.' }] };
     }
     const { readWindow } = await import('./sdk.js');
@@ -360,6 +636,41 @@ server.tool(
       .map((text, i) => `${line - b + i}: ${text}`)
       .join('\n');
     return { content: [{ type: 'text', text: numbered }] };
+  },
+);
+
+// --- prewarm_docs: sinh trước generated interface ------------------------------
+server.tool(
+  'prewarm_docs',
+  'Generate and cache Swift documentation sources (Xcode "generated interface") for frameworks, so later searches return doc comments without delay. Runs ~1-3s per framework; results are cached on disk per Xcode build.',
+  {
+    frameworks: z.array(z.string()).optional().describe('Frameworks to prewarm (e.g. ["SwiftUI","WidgetKit"]). Omit to prewarm every Swift framework — slow, minutes.'),
+    platform: z.string().optional().describe(platformDesc),
+  },
+  async ({ frameworks, platform }) => {
+    let files = discoverFiles(platsArg(platform)).filter((f) => f.lang === 'swift');
+    if (frameworks && frameworks.length > 0) {
+      const want = new Set(frameworks.map((f) => f.toLowerCase()));
+      files = files.filter((f) => want.has(f.framework.toLowerCase()));
+    }
+    if (files.length === 0) {
+      return { content: [{ type: 'text', text: 'No Swift frameworks matched.' }] };
+    }
+    const t0 = Date.now();
+    const res = await ensureIfacesFor(files);
+    const ok = res.filter((r) => r.ok);
+    return {
+      content: [{
+        type: 'text',
+        text: JSON.stringify({
+          cacheDir: cacheRoot(),
+          requested: res.length,
+          generated: ok.length,
+          failed: res.filter((r) => !r.ok).map((r) => `${r.platform}/${r.framework}`).slice(0, 50),
+          elapsedMs: Date.now() - t0,
+        }, null, 2),
+      }],
+    };
   },
 );
 
@@ -377,7 +688,17 @@ server.tool(
     const files = filesFor(framework, platform);
     const n = Math.min(Math.max(limit ?? 30, 1), 200);
     const matches = await rgMatches(pattern, files, n);
-    return { content: [{ type: 'text', text: JSON.stringify(matches, null, 2) }] };
+    // Path lặp ở mọi match nhưng thường chỉ 1-3 file -> bảng id.
+    const paths = [...new Set(matches.map((m) => m.file))];
+    const idOf = new Map(paths.map((p, i) => [p, i + 1]));
+    const body = paths.length === 1
+      ? { file: paths[0], count: matches.length, matches: matches.map((m) => ({ line: m.lineNumber, text: m.lineText })) }
+      : {
+        files: Object.fromEntries(paths.map((p, i) => [i + 1, p])),
+        count: matches.length,
+        matches: matches.map((m) => ({ file: idOf.get(m.file), line: m.lineNumber, text: m.lineText })),
+      };
+    return { content: [{ type: 'text', text: JSON.stringify(body, null, 2) }] };
   },
 );
 
@@ -387,10 +708,13 @@ server.tool(
   'List all Apple SDK frameworks and the platforms each exists on (from SDK directory scan, no parsing).',
   {
     platform: z.string().optional().describe(platformDesc),
+    include_private: z.boolean().optional().describe('Include Apple-internal _-prefixed frameworks (default false)'),
   },
-  async ({ platform }) => {
-    const fws = listFrameworksFast(platsArg(platform)).sort((a, b) => a.name.localeCompare(b.name));
-    return { content: [{ type: 'text', text: JSON.stringify(fws, null, 2) }] };
+  async ({ platform, include_private }) => {
+    let fws = listFrameworksFast(platsArg(platform)).sort((a, b) => a.name.localeCompare(b.name));
+    // `_AppIntents_SwiftUI` & co: internal của Apple, agent không dùng được.
+    if (!include_private) fws = fws.filter((f) => !f.name.startsWith('_'));
+    return { content: [{ type: 'text', text: JSON.stringify({ count: fws.length, frameworks: fws }, null, 2) }] };
   },
 );
 
@@ -402,10 +726,14 @@ server.tool(
     version: z.string().describe('Version string, e.g. "26.0", "18.0", "11.0"'),
     framework: z.string().optional().describe('Filter by framework'),
     platform: z.string().optional().describe(platformDesc),
+    limit: z.number().optional().describe('Max APIs (default 40, max 200)'),
+    verbose: z.boolean().optional().describe('Return full fields without hoisting/compaction (default false)'),
   },
-  async ({ version, framework, platform }) => {
+  async ({ version, framework, platform, limit, verbose }) => {
     const files = filesFor(framework, platform);
+    const byPath = filesByPath(files);
     const v = version.trim();
+    const n = Math.min(Math.max(limit ?? 40, 1), 200);
     const patterns = [`introduced: ${v}`, `iOS ${v}`, `ios(${v}`, `(${v.split('.').join('_')}`, ` ${v},`];
     const seen = new Map<string, { file: string; lineNumber: number; lineText: string }>();
     for (const p of patterns) {
@@ -414,8 +742,26 @@ server.tool(
         if (!seen.has(k)) seen.set(k, m);
       }
     }
-    const out = [...seen.values()].slice(0, 200);
-    return { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }] };
+    // Dòng marker -> API thật (tên + kind + signature + version).
+    const { fileLines } = await import('./sdk.js');
+    const hits: ConvertedHit[] = [];
+    const dedup = new Set<string>();
+    for (const m of seen.values()) {
+      const file = byPath.get(m.file);
+      if (!file) continue;
+      const hit = declFromMarker(
+        file, m.lineNumber, fileLines(m.file),
+        file.lang === 'objc' ? objcMapFor(file) : undefined,
+      );
+      if (!hit) continue;
+      const k = `${hit.kind}:${hit.name}@${hit.framework}:${hit.signature}`;
+      if (dedup.has(k)) continue;
+      dedup.add(k);
+      hits.push(withAbstract(hit));
+      if (hits.length >= n) break;
+    }
+    const packed = packList(rankHits(hits, version), verbose ?? false);
+    return { content: [{ type: 'text', text: JSON.stringify(packed, null, 2) }] };
   },
 );
 
@@ -427,15 +773,19 @@ server.tool(
     query: z.string().optional().describe('Optional keyword to narrow (e.g. "Text", "foregroundColor"). Omit for a broad scan (capped).'),
     framework: z.string().optional().describe('Filter by framework'),
     platform: z.string().optional().describe(platformDesc),
+    limit: z.number().optional().describe('Max APIs (default 40, max 200)'),
+    verbose: z.boolean().optional().describe('Return full fields without hoisting/compaction (default false)'),
   },
-  async ({ query, framework, platform }) => {
+  async ({ query, framework, platform, limit, verbose }) => {
     const files = filesFor(framework, platform);
+    const byPath = filesByPath(files);
+    const n = Math.min(Math.max(limit ?? 40, 1), 200);
     const markers = ['deprecated:', 'API_DEPRECATED', 'NS_DEPRECATED', 'unavailable'];
     const seen = new Map<string, { file: string; lineNumber: number; lineText: string }>();
     for (const mk of markers) {
-      const pat = query ? `${mk}` : mk;
-      void pat;
       for (const m of await rgMatches(mk, files, 60)) {
+        // Sentinel `deprecated: 100000.0` = CHƯA deprecated -> loại.
+        if (!isRealDeprecation(m.lineText)) continue;
         if (query && !m.lineText.toLowerCase().includes(query.toLowerCase())) {
           // lọc thô: cần query trong dòng marker HOẶC dòng decl kề sau
           const { readWindow } = await import('./sdk.js');
@@ -444,11 +794,29 @@ server.tool(
         }
         const k = `${m.file}:${m.lineNumber}`;
         if (!seen.has(k)) seen.set(k, m);
-        if (seen.size >= 200) break;
+        if (seen.size >= 300) break;
       }
-      if (seen.size >= 200) break;
+      if (seen.size >= 300) break;
     }
-    return { content: [{ type: 'text', text: JSON.stringify([...seen.values()].slice(0, 200), null, 2) }] };
+    const { fileLines } = await import('./sdk.js');
+    const hits: ConvertedHit[] = [];
+    const dedup = new Set<string>();
+    for (const m of seen.values()) {
+      const file = byPath.get(m.file);
+      if (!file) continue;
+      const hit = declFromMarker(
+        file, m.lineNumber, fileLines(m.file),
+        file.lang === 'objc' ? objcMapFor(file) : undefined,
+      );
+      if (!hit) continue;
+      const k = `${hit.kind}:${hit.name}@${hit.framework}:${hit.signature}`;
+      if (dedup.has(k)) continue;
+      dedup.add(k);
+      hits.push(withAbstract(hit));
+      if (hits.length >= n) break;
+    }
+    const packed = packList(query ? rankHits(hits, query) : hits, verbose ?? false);
+    return { content: [{ type: 'text', text: JSON.stringify(packed, null, 2) }] };
   },
 );
 

@@ -1,87 +1,97 @@
-# ios-sdk-mcp v0.4 — direct SDK mode
+# ios-sdk-mcp v0.5 — direct SDK mode + doc thật của Apple
 
 MCP server đọc **trực tiếp file SDK trong Xcode.app** (không index, không database).
-AI agent hiểu **API là gì, version nào, dùng thế nào** qua output đã convert gọn.
+AI agent hiểu **API là gì, version nào, dùng thế nào** — kèm **tài liệu gốc của
+Apple**, đúng bản Xcode đang cài.
 
-Chi tiết kiến trúc: xem [DIRECT.md](DIRECT.md).
+Chi tiết kiến trúc: xem [DIRECT.md](DIRECT.md). Ghi chú nghiên cứu SDK: [RESEARCH.md](RESEARCH.md).
+
+## Vì sao có v0.5
+
+`.swiftinterface` trong SDK đã bị strip hết doc comment. Xcode không đọc file đó:
+Cmd-click 1 API thì nó gọi sourcekitd sinh **generated interface** (declaration +
+doc `///` đầy đủ). v0.5 sinh đúng file đó, cache ra đĩa, rồi `rg` trực tiếp trên nó.
+
+| Nguồn | SwiftUI/ios | Doc |
+|---|---|---|
+| `.swiftinterface` (v0.4) | 26.771 dòng | ❌ không có |
+| generated interface (v0.5) | ~144.000 dòng | ✅ đầy đủ |
 
 ## Features
 
+- **Doc comment thật** cho Swift API: abstract, mô tả, ví dụ code, link ``Type/member``
 - Scope-aware Swift parser (`extension` availability inheritance, `open`/`nonisolated`/
-  attribute prefixes, `macro`/`associatedtype`/`case`, both `@available` families)
-- Inline-macro ObjC parser (`API_AVAILABLE` suffixes, `NS_ENUM` members, block `/* */` +
-  `//` doc comments) — every decl captured even without availability
-- Version-first schema: `introduced_in`, `deprecated_in`, `obsoleted_in`, `renamed_to`
-- Docs layer: markdown knowledge (`ios27-full-knowledge.md`, Xcode AdditionalDocumentation)
-  searchable via `get_guide`
-- Prebuilt SQLite index → MCP startup ~0.2 s (no re-parse per launch)
-- 67 unit + integration tests (`npm test`)
+  attribute prefixes, `macro`/`associatedtype`/`case`, cả 2 họ `@available`)
+- Inline-macro ObjC parser (`API_AVAILABLE` suffixes, `NS_ENUM` members, doc `/* */` + `//`)
+- Version-first: `introducedIn`, `deprecatedIn`, `renamedTo`, `unavailable`
+- 5 platform: ios, watchos, macos, tvos, xros
+- Không index/database: khởi động tức thì, luôn khớp SDK hiện tại
+- 204 test (`npm test`)
 
 ## Setup
 
 ```bash
 npm install
 npm run build
-npm run build-index -- --out symbols.db   # one-time (~12 s, ~98 MB)
 ```
 
-## Usage
+Yêu cầu: Xcode, `rg` (ripgrep) trong PATH, `python3` (chỉ dùng stdlib).
 
-Add to your MCP client config:
+## Usage
 
 ```json
 {
   "mcpServers": {
     "ios-sdk": {
       "command": "node",
-      "args": ["/path/to/ios-sdk-mcp/dist/index.js"],
-      "env": {
-        "IOS_INDEX_PATH": "/path/to/ios-sdk-mcp/symbols.db"
-      }
+      "args": ["/path/to/ios-sdk-mcp/dist/index.js"]
     }
   }
 }
 ```
 
-Without `IOS_INDEX_PATH` the server builds the index in memory on startup
-(~12 s, then works normally). Custom SDK path via `IOS_SDK_PATH`.
-Rebuild the db file whenever Xcode is upgraded (`npm run build-index -- --out symbols.db`).
+Cache doc mặc định ở `~/.cache/ios-sdk-mcp/<XcodeBuild>/` — đổi bằng biến môi
+trường `IOS_SDK_MCP_CACHE`. Nâng cấp Xcode thì key cache tự đổi, không cần rebuild.
 
-## Available Tools (8)
+Lần đầu hỏi 1 framework mất ~0,4–3s để sinh doc; sau đó đọc file, ~0,1s.
+Muốn sinh sẵn: gọi tool `prewarm_docs`.
 
-| Tool | AI answers |
+## Available Tools (11)
+
+| Tool | AI trả lời được |
 |------|-------------|
-| `search_apis` | Find APIs — ranked exact > prefix > contains; filters `framework`, `ios_version`, `kind` |
-| `get_api_detail` | Full signature + versions + deprecation + doc comment (concrete decls rank above extensions) |
-| `get_type_members` | All members of a type (methods, properties, enum cases) |
-| `get_new_apis` | "What's new in iOS 26 for SwiftUI?" |
-| `get_deprecated` | Deprecated/obsoleted APIs + `renamed_to` for code migration |
-| `get_guide` | Usage guides + code examples from the knowledge docs |
-| `list_frameworks` | Framework discovery (`new_only` for iOS 26+) |
-| `get_sdk_stats` | Index stats incl. version coverage |
+| `search_apis` | Tìm API — rank exact > prefix > contains; kèm abstract ngắn; lọc `framework`/`kind`/`platform` |
+| `get_api_detail` | Signature + version + deprecation + **doc đầy đủ** + members |
+| `get_type_members` | Mọi member của type, gồm cả khai báo trong `extension`, mỗi member kèm abstract |
+| `prewarm_docs` | Sinh trước doc cho framework (hoặc tất cả) |
+| `read_source` | Đọc source gốc quanh 1 dòng (SDK hoặc generated interface) |
+| `grep_sdk` | Tìm thô file+dòng+text trên toàn SDK |
+| `get_new_apis` | "iOS 26 có gì mới cho SwiftUI?" |
+| `get_deprecated` | API deprecated + `renamedTo` để migrate code |
+| `get_guide` | Guide/ví dụ từ markdown knowledge docs |
+| `list_frameworks` | Framework nào có trên platform nào |
+| `get_sdk_stats` | Thống kê file theo platform/lang |
 
 ## Architecture
 
 ```
 ios-sdk-mcp/
+├── scripts/
+│   └── gen-iface.py    # sourcekitd (ctypes) -> generated interface, ghi atomic
 ├── src/
-│   ├── index.ts        # MCP server entry (stdio, opens symbols.db read-only)
-│   ├── build-index.ts  # One-time builder: SDK + docs -> symbols.db
-│   ├── indexer.ts      # SQLite store + ranked queries
-│   ├── parser.ts       # Scope-aware Swift + inline-macro ObjC parsers
-│   ├── parser.test.ts  # 50+ parser fixtures (attribute traps, version families)
-│   ├── indexer.test.ts # Integration tests on a fixture SDK
-│   └── types.ts        # Type definitions
-├── RESEARCH.md         # SDK anatomy research (source of truth for parser design)
-└── README.md
+│   ├── index.ts        # MCP server (stdio), 11 tools
+│   ├── iface.ts        # Nguồn doc: sinh + cache + đổi nguồn Swift
+│   ├── sdk.ts          # discoverFiles, ripgrep, analyzeContext (version + doc)
+│   ├── convert.ts      # 1 dòng match -> API object, ranking
+│   ├── parser.ts       # Swift/ObjC parser dùng làm thư viện hàm
+│   └── types.ts
+└── tests/              # 204 test (docs, direct/ground-truth, parser, legacy)
 ```
 
 ## Data Flow
 
 ```
-.swiftinterface ──> swift_parser (scope stack + strip attrs + 2 @available families) ──┐
-.h headers ───────> objc_parser (inline macros + preceding comments) ─────────────────┤──> symbols.db ──> MCP tools
-knowledge.md + AdditionalDocumentation/*.md ──> docs_loader ──────────────────────────┘
+SwiftUI, UIKit... ──sourcekitd──> generated interface (.swift, CÓ doc) ──┐
+.swiftinterface (fallback khi không sinh được) ──────────────────────────┤──rg──> convert ──> MCP tools
+.h headers ──────────────────────────────────────────────────────────────┘
 ```
-
-Research notes: see [RESEARCH.md](RESEARCH.md).

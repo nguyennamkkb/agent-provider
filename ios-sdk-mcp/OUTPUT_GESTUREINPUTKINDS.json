@@ -1,0 +1,421 @@
+{
+  "detail_watchos": {
+    "tool": "get_api_detail",
+    "args": {
+      "name": "GestureInputKinds",
+      "framework": "SwiftUI",
+      "platform": "watchos"
+    },
+    "elapsedMs": 1180,
+    "bytes": 4610,
+    "result": {
+      "name": "GestureInputKinds",
+      "kind": "struct",
+      "framework": "SwiftUI",
+      "lang": "swift",
+      "platform": "watchos",
+      "signature": "public struct GestureInputKinds : OptionSet, Sendable",
+      "availability": "@available(anyAppleOS 27.0, *)",
+      "docComment": "An option set that specifies which input kinds a gesture should recognize.",
+      "filePath": "/Users/nguyenluongnam/.cache/ios-sdk-mcp/27A266a/watchos/SwiftUI/SwiftUI.swift",
+      "lineNumber": 24555,
+      "members": [
+        {
+          "name": "rawValue",
+          "kind": "var",
+          "signature": "public let rawValue: Int8",
+          "docComment": "The corresponding value of the raw type.\n\nA new instance initialized with `rawValue` will be equivalent to this\ninstance. For example:\n\n    enum PaperSize: String {\n        case A4, A5, Letter, Legal\n    }\n\n    let selectedSize = PaperSize.Letter\n    print(selectedSize.rawValue)\n    // Prints \"Letter\"\n\n    print(selectedSize == PaperSize(rawValue: selectedSize.rawValue)!)\n    // Prints \"true\"",
+          "line": 24572
+        },
+        {
+          "name": "init",
+          "kind": "init",
+          "signature": "public init(rawValue: Int8)",
+          "docComment": "Creates a new option set from the given raw value.\n\nThis initializer always succeeds, even if the value passed as `rawValue`\nexceeds the static properties declared as part of the option set. This\nexample creates an instance of `ShippingOptions` with a raw value beyond\nthe highest element, with a bit mask that effectively contains all the\ndeclared static members.\n\n    let extraOptions = ShippingOptions(rawValue: 255)\n    print(extraOptions.isStrictSuperset(of: .all))\n    // Prints \"true\"\n\n- Parameter rawValue: The raw value of the option set to create. Each bit\n  of `rawValue` potentially represents an element of the option set,\n  though raw values may include bits that are not defined as distinct\n  values of the `OptionSet` type.",
+          "line": 24590
+        },
+        {
+          "name": "directTouch",
+          "kind": "var",
+          "signature": "public static let directTouch: GestureInputKinds",
+          "docComment": "A person is touching content directly.\n\nExamples:\n\n- touching a screen directly with fingers,\n- directly touching or pinching content in visionOS.\n\n- Note: In visionOS, you can further customize what hand motions your\n  gesture recognizes using ``Gesture/handActivationBehavior(_:)``.",
+          "line": 24601
+        },
+        {
+          "name": "indirectTouch",
+          "kind": "var",
+          "signature": "public static let indirectTouch: GestureInputKinds",
+          "docComment": "A person is touching content indirectly.\n\nExamples:\n\n- performing a multi-touch gesture on a trackpad’s surface,\n- swiping on Siri Remote’s surface in tvOS,\n- indirectly pinching content while looking at it in visionOS.",
+          "line": 24610
+        },
+        {
+          "name": "pencil",
+          "kind": "var",
+          "signature": "public static let pencil: GestureInputKinds",
+          "docComment": "A person is touching content directly with an Apple Pencil, or an\nother supported pencil device.",
+          "line": 24614
+        },
+        {
+          "name": "pointer",
+          "kind": "var",
+          "signature": "public static let pointer: GestureInputKinds",
+          "docComment": "A person is pressing a mouse or a trackpad button while the pointer\nis pointing at content.",
+          "line": 24618
+        },
+        {
+          "name": "all",
+          "kind": "var",
+          "signature": "public static let all: GestureInputKinds",
+          "docComment": "All possible gesture input kinds, present and future.",
+          "line": 24621
+        },
+        {
+          "name": "ArrayLiteralElement",
+          "kind": "typealias",
+          "signature": "public typealias ArrayLiteralElement = GestureInputKinds",
+          "docComment": "The type of the elements of an array literal.",
+          "line": 24625
+        },
+        {
+          "name": "Element",
+          "kind": "typealias",
+          "signature": "public typealias Element = GestureInputKinds",
+          "docComment": "The element type of the option set.\n\nTo inherit all the default implementations from the `OptionSet` protocol,\nthe `Element` type must be `Self`, the default.",
+          "line": 24632
+        },
+        {
+          "name": "RawValue",
+          "kind": "typealias",
+          "signature": "public typealias RawValue = Int8",
+          "docComment": "The raw type that can be used to represent all values of the conforming\ntype.\n\nEvery distinct value of the conforming type has a corresponding unique\nvalue of the `RawValue` type, but there may be values of the `RawValue`\ntype that don't have a corresponding value of the conforming type.",
+          "line": 24641
+        }
+      ]
+    }
+  },
+  "members_watchos": {
+    "tool": "get_type_members",
+    "args": {
+      "name": "GestureInputKinds",
+      "framework": "SwiftUI",
+      "platform": "watchos"
+    },
+    "elapsedMs": 42,
+    "bytes": 2502,
+    "result": {
+      "type": "GestureInputKinds",
+      "framework": "SwiftUI",
+      "platform": "watchos",
+      "lang": "swift",
+      "filePath": "/Users/nguyenluongnam/.cache/ios-sdk-mcp/27A266a/watchos/SwiftUI/SwiftUI.swift",
+      "count": 10,
+      "members": [
+        {
+          "name": "rawValue",
+          "kind": "var",
+          "signature": "public let rawValue: Int8",
+          "docComment": "The corresponding value of the raw type.",
+          "line": 24572
+        },
+        {
+          "name": "directTouch",
+          "kind": "var",
+          "signature": "public static let directTouch: GestureInputKinds",
+          "docComment": "A person is touching content directly.",
+          "line": 24601
+        },
+        {
+          "name": "indirectTouch",
+          "kind": "var",
+          "signature": "public static let indirectTouch: GestureInputKinds",
+          "docComment": "A person is touching content indirectly.",
+          "line": 24610
+        },
+        {
+          "name": "pencil",
+          "kind": "var",
+          "signature": "public static let pencil: GestureInputKinds",
+          "docComment": "A person is touching content directly with an Apple Pencil, or an other supported pencil device.",
+          "line": 24614
+        },
+        {
+          "name": "pointer",
+          "kind": "var",
+          "signature": "public static let pointer: GestureInputKinds",
+          "docComment": "A person is pressing a mouse or a trackpad button while the pointer is pointing at content.",
+          "line": 24618
+        },
+        {
+          "name": "all",
+          "kind": "var",
+          "signature": "public static let all: GestureInputKinds",
+          "docComment": "All possible gesture input kinds, present and future.",
+          "line": 24621
+        },
+        {
+          "name": "ArrayLiteralElement",
+          "kind": "typealias",
+          "signature": "public typealias ArrayLiteralElement = GestureInputKinds",
+          "docComment": "The type of the elements of an array literal.",
+          "line": 24625
+        },
+        {
+          "name": "Element",
+          "kind": "typealias",
+          "signature": "public typealias Element = GestureInputKinds",
+          "docComment": "The element type of the option set.",
+          "line": 24632
+        },
+        {
+          "name": "RawValue",
+          "kind": "typealias",
+          "signature": "public typealias RawValue = Int8",
+          "docComment": "The raw type that can be used to represent all values of the conforming type.",
+          "line": 24641
+        },
+        {
+          "name": "init",
+          "kind": "init",
+          "signature": "public init(rawValue: Int8)",
+          "docComment": "Creates a new option set from the given raw value.",
+          "line": 24590
+        }
+      ]
+    }
+  },
+  "members_internal": {
+    "tool": "get_type_members",
+    "args": {
+      "name": "GestureInputKinds",
+      "framework": "SwiftUI",
+      "platform": "watchos",
+      "include_internal": true
+    },
+    "elapsedMs": 38,
+    "bytes": 2502,
+    "result": {
+      "type": "GestureInputKinds",
+      "framework": "SwiftUI",
+      "platform": "watchos",
+      "lang": "swift",
+      "filePath": "/Users/nguyenluongnam/.cache/ios-sdk-mcp/27A266a/watchos/SwiftUI/SwiftUI.swift",
+      "count": 10,
+      "members": [
+        {
+          "name": "rawValue",
+          "kind": "var",
+          "signature": "public let rawValue: Int8",
+          "docComment": "The corresponding value of the raw type.",
+          "line": 24572
+        },
+        {
+          "name": "directTouch",
+          "kind": "var",
+          "signature": "public static let directTouch: GestureInputKinds",
+          "docComment": "A person is touching content directly.",
+          "line": 24601
+        },
+        {
+          "name": "indirectTouch",
+          "kind": "var",
+          "signature": "public static let indirectTouch: GestureInputKinds",
+          "docComment": "A person is touching content indirectly.",
+          "line": 24610
+        },
+        {
+          "name": "pencil",
+          "kind": "var",
+          "signature": "public static let pencil: GestureInputKinds",
+          "docComment": "A person is touching content directly with an Apple Pencil, or an other supported pencil device.",
+          "line": 24614
+        },
+        {
+          "name": "pointer",
+          "kind": "var",
+          "signature": "public static let pointer: GestureInputKinds",
+          "docComment": "A person is pressing a mouse or a trackpad button while the pointer is pointing at content.",
+          "line": 24618
+        },
+        {
+          "name": "all",
+          "kind": "var",
+          "signature": "public static let all: GestureInputKinds",
+          "docComment": "All possible gesture input kinds, present and future.",
+          "line": 24621
+        },
+        {
+          "name": "ArrayLiteralElement",
+          "kind": "typealias",
+          "signature": "public typealias ArrayLiteralElement = GestureInputKinds",
+          "docComment": "The type of the elements of an array literal.",
+          "line": 24625
+        },
+        {
+          "name": "Element",
+          "kind": "typealias",
+          "signature": "public typealias Element = GestureInputKinds",
+          "docComment": "The element type of the option set.",
+          "line": 24632
+        },
+        {
+          "name": "RawValue",
+          "kind": "typealias",
+          "signature": "public typealias RawValue = Int8",
+          "docComment": "The raw type that can be used to represent all values of the conforming type.",
+          "line": 24641
+        },
+        {
+          "name": "init",
+          "kind": "init",
+          "signature": "public init(rawValue: Int8)",
+          "docComment": "Creates a new option set from the given raw value.",
+          "line": 24590
+        }
+      ]
+    }
+  },
+  "usage": {
+    "tool": "search_apis",
+    "args": {
+      "query": "GestureInputKinds",
+      "framework": "SwiftUI",
+      "platform": "watchos",
+      "limit": 20
+    },
+    "elapsedMs": 75,
+    "bytes": 5455,
+    "result": {
+      "framework": "SwiftUI",
+      "platform": "watchos",
+      "lang": "swift",
+      "filePath": "/Users/nguyenluongnam/.cache/ios-sdk-mcp/27A266a/watchos/SwiftUI/SwiftUI.swift",
+      "count": 14,
+      "apis": [
+        {
+          "name": "GestureInputKinds",
+          "kind": "struct",
+          "signature": "public struct GestureInputKinds : OptionSet, Sendable",
+          "availability": "@available(anyAppleOS 27.0, *)",
+          "docComment": "An option set that specifies which input kinds a gesture should recognize.",
+          "line": 24555
+        },
+        {
+          "name": "onLongPressGesture",
+          "kind": "func",
+          "signature": "nonisolated public func onLongPressGesture(minimumDuration: Double = 0.5, maximumDistance: CGFloat = 10, inputKinds: GestureInputKinds = .all, perform action: @escaping () -> Void, onPressingChanged: ((Bool) -> Void)? = nil) -> some View",
+          "availability": "@available(tvOS, unavailable); @available(anyAppleOS 27.0, *)",
+          "docComment": "Adds an action to perform when this view recognizes a long press gesture.",
+          "line": 82423
+        },
+        {
+          "name": "onTapGesture",
+          "kind": "func",
+          "signature": "nonisolated public func onTapGesture(count: Int = 1, coordinateSpace: some CoordinateSpaceProtocol = .local, inputKinds: GestureInputKinds = .all, perform action: @escaping (CGPoint) -> Void) -> some View",
+          "availability": "@available(anyAppleOS 27.0, *)",
+          "docComment": "Adds an action to perform when this view recognizes a tap gesture, and provides the action with the location of the interaction.",
+          "line": 86654
+        },
+        {
+          "name": "directTouch",
+          "kind": "var",
+          "signature": "public static let directTouch: GestureInputKinds",
+          "availability": "@available(anyAppleOS 27.0, *)",
+          "docComment": "A person is touching content directly.",
+          "line": 24601
+        },
+        {
+          "name": "indirectTouch",
+          "kind": "var",
+          "signature": "public static let indirectTouch: GestureInputKinds",
+          "availability": "@available(anyAppleOS 27.0, *)",
+          "docComment": "A person is touching content indirectly.",
+          "line": 24610
+        },
+        {
+          "name": "pencil",
+          "kind": "var",
+          "signature": "public static let pencil: GestureInputKinds",
+          "availability": "@available(anyAppleOS 27.0, *)",
+          "docComment": "A person is touching content directly with an Apple Pencil, or an other supported pencil device.",
+          "line": 24614
+        },
+        {
+          "name": "pointer",
+          "kind": "var",
+          "signature": "public static let pointer: GestureInputKinds",
+          "availability": "@available(anyAppleOS 27.0, *)",
+          "docComment": "A person is pressing a mouse or a trackpad button while the pointer is pointing at content.",
+          "line": 24618
+        },
+        {
+          "name": "all",
+          "kind": "var",
+          "signature": "public static let all: GestureInputKinds",
+          "availability": "@available(anyAppleOS 27.0, *)",
+          "docComment": "All possible gesture input kinds, present and future.",
+          "line": 24621
+        },
+        {
+          "name": "ArrayLiteralElement",
+          "kind": "typealias",
+          "signature": "public typealias ArrayLiteralElement = GestureInputKinds",
+          "availability": "@available(anyAppleOS 27.0, *)",
+          "docComment": "The type of the elements of an array literal.",
+          "line": 24625
+        },
+        {
+          "name": "Element",
+          "kind": "typealias",
+          "signature": "public typealias Element = GestureInputKinds",
+          "availability": "@available(anyAppleOS 27.0, *)",
+          "docComment": "The element type of the option set.",
+          "line": 24632
+        },
+        {
+          "name": "init",
+          "kind": "init",
+          "signature": "@MainActor @preconcurrency public init(minimumDistance: CGFloat = 10, coordinateSpace: some CoordinateSpaceProtocol = .local, inputKinds: GestureInputKinds = .all)",
+          "availability": "@available(tvOS, unavailable); @available(anyAppleOS 27.0, *)",
+          "docComment": "Creates a dragging gesture with the minimum dragging distance before the gesture succeeds, the coordinate space of the gesture's location, and the input kinds the gesture recognizes.",
+          "line": 16240
+        },
+        {
+          "name": "init",
+          "kind": "init",
+          "signature": "nonisolated public init(minimumDuration: Double = 0.5, maximumDistance: CGFloat = 10, inputKinds: GestureInputKinds = .all)",
+          "availability": "@available(tvOS, unavailable); @available(anyAppleOS 27.0, *)",
+          "docComment": "Creates a long-press gesture with a minimum duration, a maximum distance, and the input kinds the gesture recognizes.",
+          "line": 34932
+        },
+        {
+          "name": "init",
+          "kind": "init",
+          "signature": "nonisolated public init(count: Int = 1, coordinateSpace: some CoordinateSpaceProtocol = .local, inputKinds: GestureInputKinds = .all)",
+          "availability": "@available(tvOS, unavailable); @available(anyAppleOS 27.0, *)",
+          "docComment": "Creates a tap gesture with the number of required taps, the coordinate space of the gesture's location, and the input kinds the gesture recognizes.",
+          "line": 55214
+        },
+        {
+          "name": "init",
+          "kind": "init",
+          "signature": "nonisolated public init(count: Int = 1, inputKinds: GestureInputKinds = .all)",
+          "availability": "@available(anyAppleOS 27.0, *)",
+          "docComment": "Creates a tap gesture with the number of required taps and the input kinds the gesture recognizes.",
+          "line": 62055
+        }
+      ]
+    }
+  },
+  "source": {
+    "tool": "read_source",
+    "args": {
+      "file": "/Users/nguyenluongnam/.cache/ios-sdk-mcp/27A266a/watchos/SwiftUI/SwiftUI.swift",
+      "line": 24555,
+      "before": 6,
+      "after": 40
+    },
+    "elapsedMs": 1,
+    "bytes": 2230,
+    "result": "24549:     ///   gesture.\n24550:     @MainActor @inlinable @preconcurrency public func updating<State>(_ state: GestureState<State>, body: @escaping (Self.Value, inout State, inout Transaction) -> Void) -> GestureStateGesture<Self, State>\n24551: }\n24552: \n24553: /// An option set that specifies which input kinds a gesture should recognize.\n24554: @available(anyAppleOS 27.0, *)\n24555: public struct GestureInputKinds : OptionSet, Sendable {\n24556: \n24557:     /// The corresponding value of the raw type.\n24558:     ///\n24559:     /// A new instance initialized with `rawValue` will be equivalent to this\n24560:     /// instance. For example:\n24561:     ///\n24562:     ///     enum PaperSize: String {\n24563:     ///         case A4, A5, Letter, Legal\n24564:     ///     }\n24565:     ///\n24566:     ///     let selectedSize = PaperSize.Letter\n24567:     ///     print(selectedSize.rawValue)\n24568:     ///     // Prints \"Letter\"\n24569:     ///\n24570:     ///     print(selectedSize == PaperSize(rawValue: selectedSize.rawValue)!)\n24571:     ///     // Prints \"true\"\n24572:     public let rawValue: Int8\n24573: \n24574:     /// Creates a new option set from the given raw value.\n24575:     ///\n24576:     /// This initializer always succeeds, even if the value passed as `rawValue`\n24577:     /// exceeds the static properties declared as part of the option set. This\n24578:     /// example creates an instance of `ShippingOptions` with a raw value beyond\n24579:     /// the highest element, with a bit mask that effectively contains all the\n24580:     /// declared static members.\n24581:     ///\n24582:     ///     let extraOptions = ShippingOptions(rawValue: 255)\n24583:     ///     print(extraOptions.isStrictSuperset(of: .all))\n24584:     ///     // Prints \"true\"\n24585:     ///\n24586:     /// - Parameter rawValue: The raw value of the option set to create. Each bit\n24587:     ///   of `rawValue` potentially represents an element of the option set,\n24588:     ///   though raw values may include bits that are not defined as distinct\n24589:     ///   values of the `OptionSet` type.\n24590:     public init(rawValue: Int8)\n24591: \n24592:     /// A person is touching content directly.\n24593:     ///\n24594:     /// Examples:"
+  }
+}

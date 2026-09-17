@@ -155,14 +155,23 @@ export function objcLineMap(
   return map;
 }
 
-export function rankHits<T extends { name: string; kind: string }>(hits: T[], query: string): T[] {
+/** Frameworks AI/agents hỏi nhiều nhất (SwiftUI/UIKit đứng trước framework lạ). */
+const FW_BOOST: Record<string, number> = {
+  swiftui: 8, swiftuicore: 8, uikit: 6, foundation: 5, combine: 4,
+  widgetkit: 4, watchkit: 4, appkit: 4, realitykit: 3, arkit: 3,
+  appintents: 3, swiftdata: 2, charts: 2, mapkit: 2,
+};
+
+export function rankHits<T extends { name: string; kind: string; framework?: string }>(hits: T[], query: string): T[] {
   const q = query.toLowerCase();
   const toks = tokenize(query);
   const score = (h: T & { signature?: string }): number => {
     const n = h.name.toLowerCase();
+    // Exact-name là tín hiệu mạnh nhất: `Text` phải thắng `value`/`context`
+    // dù kind/framework nào. Gap lớn để FW_BOOST/KIND không lật được.
     let s = 0;
-    if (n === q) s += 100;
-    else if (n.startsWith(q)) s += 60;
+    if (n === q) s += 500;
+    else if (n.startsWith(q)) s += 120;
     else if (n.includes(q)) s += 30;
     if (toks.length > 1) {
       const hay = `${n} ${(h.signature ?? '').toLowerCase()}`;
@@ -172,6 +181,12 @@ export function rankHits<T extends { name: string; kind: string }>(hits: T[], qu
     }
     s -= (KIND_RANK[h.kind] ?? 20) * 0.5;
     if (/^_/.test(h.name)) s -= 10;
+    // Ưu tiên framework phổ biến + nền tảng chính (ios trước watchos/macos...).
+    // Tránh top bị framework lạ (AVKit TransitionContext, AppIntents font...) chiếm.
+    const fw = (h.framework ?? '').toLowerCase();
+    s += FW_BOOST[fw] ?? 0;
+    const plat = (h as { platform?: string }).platform ?? '';
+    if (plat === 'ios') s += 2;
     return s;
   };
   return [...hits].sort((a, b) => score(b) - score(a));
