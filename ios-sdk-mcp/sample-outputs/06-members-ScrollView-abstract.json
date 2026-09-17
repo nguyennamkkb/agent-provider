@@ -1,0 +1,40 @@
+{
+    "type": "ScrollView",
+    "framework": "SwiftUI",
+    "platform": "ios",
+    "lang": "swift",
+    "filePath": "/Users/nguyenluongnam/.cache/ios-sdk-mcp/27A266a/ios/SwiftUI/SwiftUI.swift",
+    "total": 7,
+    "offset": 0,
+    "count": 4,
+    "members": [
+        {
+            "name": "content",
+            "kind": "var",
+            "signature": "public var content: Content",
+            "docComment": "The scroll view's content.",
+            "line": 62301
+        },
+        {
+            "name": "axes",
+            "kind": "var",
+            "signature": "nonisolated public var axes: Axis.Set",
+            "docComment": "The scrollable axes of the scroll view.",
+            "line": 62306
+        },
+        {
+            "name": "showsIndicators",
+            "kind": "var",
+            "signature": "nonisolated public var showsIndicators: Bool",
+            "docComment": "A value that indicates whether the scroll view displays the scrollable component of the content offset, in a way that's suitable for the platform.",
+            "line": 62313
+        },
+        {
+            "name": "body",
+            "kind": "var",
+            "signature": "nonisolated public var body: some View",
+            "docComment": "The content and behavior of the scroll view.",
+            "line": 62333
+        }
+    ]
+}

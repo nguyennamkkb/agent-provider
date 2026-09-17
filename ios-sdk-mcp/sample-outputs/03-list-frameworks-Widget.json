@@ -1,0 +1,12 @@
+{
+    "total": 253,
+    "count": 1,
+    "frameworks": [
+        {
+            "name": "WidgetKit",
+            "platforms": [
+                "ios"
+            ]
+        }
+    ]
+}

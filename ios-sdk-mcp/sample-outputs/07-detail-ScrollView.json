@@ -1,0 +1,44 @@
+{
+    "name": "ScrollView",
+    "kind": "struct",
+    "framework": "SwiftUI",
+    "lang": "swift",
+    "platform": "ios",
+    "signature": "nonisolated public struct ScrollView<Content> : View, ~Sendable where Content : View",
+    "introducedIn": 130000,
+    "docComment": "A scrollable view.\n\nThe scroll view displays its content within the scrollable content region.\nAs the user performs platform-appropriate scroll gestures, the scroll view\nadjusts what portion of the underlying content is visible. `ScrollView` can\nscroll horizontally, vertically, or both, but does not provide zooming\nfunctionality.\n\nIn the following example, a `ScrollView` allows the user to scroll through\na ``VStack`` containing 100 ``Text`` views. The image after the listing\nshows the scroll view's temporarily visible scrollbar at the right; you can\ndisable it with the `showsIndicators` parameter of the `ScrollView`\ninitializer.\n\n    var body: some View {\n        ScrollView {\n            VStack(alignment: .leading) {\n                ForEach(0..<100) {\n                    Text(\"Row \\($0)\")\n                }\n            }\n        }\n    }\n![A scroll view with a series of vertically arranged rows, reading\nRow 1, Row 2, and so on. At the right, a scrollbar indicates that\nthis is the top of the scrollable\narea.](SwiftUI-ScrollView-rows-with-indicator.png)\n\n### Controlling Scroll Position\n\nYou can influence where a scroll view is initially scrolled\nby using the ``View/defaultScrollAnchor(_:)`` view modifier.\n\nProvide a value of ``UnitPoint/center`` to have the scroll\nview start in the center of its content when a scroll view\nis scrollable in both axes.\n\n    ScrollView([.horizontal, .vertical]) {\n        // initially centered content\n    }\n    .defaultScrollAnchor(.center)\n\nOr provide an alignment of ``UnitPoint/bottom`` to have the\nscroll view start at the bottom of its content when a scroll\nview is scrollable in its vertical axes.\n\n    ScrollView {\n        // initially bottom aligned content\n    }\n    .defaultScrollAnchor(.bottom)\n\nAfter the scroll view initially renders, the user may scroll\nthe content of the scroll view.\n\nTo perform programmatic scrolling, wrap one or more scroll views with a\n``ScrollViewReader``.",
+    "filePath": "/Users/nguyenluongnam/.cache/ios-sdk-mcp/27A266a/ios/SwiftUI/SwiftUI.swift",
+    "lineNumber": 62298,
+    "members": [
+        {
+            "name": "content",
+            "kind": "var",
+            "line": 62301
+        },
+        {
+            "name": "axes",
+            "kind": "var",
+            "line": 62306
+        },
+        {
+            "name": "showsIndicators",
+            "kind": "var",
+            "line": 62313
+        },
+        {
+            "name": "init",
+            "kind": "init",
+            "line": 62330
+        },
+        {
+            "name": "body",
+            "kind": "var",
+            "line": 62333
+        },
+        {
+            "name": "Body",
+            "kind": "typealias",
+            "line": 62340
+        }
+    ]
+}

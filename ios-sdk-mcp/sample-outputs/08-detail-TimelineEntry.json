@@ -1,0 +1,24 @@
+{
+    "name": "TimelineEntry",
+    "kind": "protocol",
+    "framework": "WidgetKit",
+    "lang": "swift",
+    "platform": "ios",
+    "signature": "public protocol TimelineEntry",
+    "introducedIn": 140000,
+    "docComment": "A type that specifies the date to display a widget, and, optionally,\nindicates the current relevance of the widget's content.\n\nA <doc:TimelineProvider> creates one or more timeline entries with\ndates that tell WidgetKit when to display a widget. To render a\nwidget, WidgetKit executes the `content` block of the widget's\nconfiguration, passing the corresponding timeline entry.\n\nWhen you declare a structure conforming to `TimelineEntry`, include any\nadditional information that the configuration\u2019s content block requires to\nrender the widget. The following code shows a timeline entry structure for\na widget that displays a game character's health level.\n\n    struct CharacterDetailEntry: TimelineEntry {\n        var date: Date\n        var healthLevel: Double\n    }\n\nThe content block of the widget's configuration receives the entry as a\nparameter and then passes the relevant information to the view that\nrenders your widget.\n\n    struct CharacterDetailWidget: Widget {\n        var body: some WidgetConfiguration {\n            StaticConfiguration(\n                kind: \"com.mygame.character-detail\",\n                provider: CharacterDetailProvider()) { entry in\n                CharacterDetailView(entry: entry)\n            }\n            .configurationDisplayName(\"Character Details\")\n            .description(\"Displays a character's health and other details\")\n            .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])\n        }\n    }",
+    "filePath": "/Users/nguyenluongnam/.cache/ios-sdk-mcp/27A266a/ios/WidgetKit/WidgetKit.swift",
+    "lineNumber": 2563,
+    "members": [
+        {
+            "name": "date",
+            "kind": "var",
+            "line": 2566
+        },
+        {
+            "name": "relevance",
+            "kind": "var",
+            "line": 2569
+        }
+    ]
+}

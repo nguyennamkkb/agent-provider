@@ -1,0 +1,62 @@
+{
+    "type": "Text",
+    "framework": "SwiftUI",
+    "platform": "ios",
+    "lang": "swift",
+    "filePath": "/Users/nguyenluongnam/.cache/ios-sdk-mcp/27A266a/ios/SwiftUI/SwiftUI.swift",
+    "total": 55,
+    "offset": 0,
+    "count": 10,
+    "members": [
+        {
+            "name": "textVariant",
+            "kind": "func",
+            "line": 82682
+        },
+        {
+            "name": "textScale",
+            "kind": "func",
+            "line": 84688
+        },
+        {
+            "name": "accessibilityTextContentType",
+            "kind": "func",
+            "line": 82589
+        },
+        {
+            "name": "LineStyle",
+            "kind": "struct",
+            "line": 82793
+        },
+        {
+            "name": "DateStyle",
+            "kind": "struct",
+            "line": 83047
+        },
+        {
+            "name": "WritingDirectionStrategy",
+            "kind": "struct",
+            "line": 83501
+        },
+        {
+            "name": "Layout",
+            "kind": "struct",
+            "line": 83582
+        },
+        {
+            "name": "LayoutKey",
+            "kind": "struct",
+            "line": 84191
+        },
+        {
+            "name": "Scale",
+            "kind": "struct",
+            "line": 84626
+        },
+        {
+            "name": "AlignmentStrategy",
+            "kind": "struct",
+            "line": 84762
+        }
+    ]
+}

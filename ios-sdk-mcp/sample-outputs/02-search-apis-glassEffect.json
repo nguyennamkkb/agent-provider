@@ -1,0 +1,29 @@
+{
+    "platform": "ios",
+    "lang": "swift",
+    "count": 2,
+    "apis": [
+        {
+            "name": "glassEffect",
+            "kind": "func",
+            "framework": "SwiftUI",
+            "signature": "nonisolated public func glassEffect(_ glass: Glass = .regular, in shape: some Shape = DefaultGlassEffectShape()) -> some View",
+            "introducedIn": 260000,
+            "docComment": "Applies a glass effect to this view.",
+            "filePath": "/Users/nguyenluongnam/.cache/ios-sdk-mcp/27A266a/ios/SwiftUI/SwiftUI.swift",
+            "match": "exact",
+            "line": 118277
+        },
+        {
+            "name": "glassEffect",
+            "kind": "func",
+            "framework": "SwiftUICore",
+            "signature": "nonisolated public func glassEffect(_ glass: Glass = .regular, in shape: some Shape = DefaultGlassEffectShape()) -> some View",
+            "introducedIn": 260000,
+            "docComment": "Applies a glass effect to this view.",
+            "filePath": "/Users/nguyenluongnam/.cache/ios-sdk-mcp/27A266a/ios/SwiftUICore/SwiftUICore.swift",
+            "match": "exact",
+            "line": 37927
+        }
+    ]
+}

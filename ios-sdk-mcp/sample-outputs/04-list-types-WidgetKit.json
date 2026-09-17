@@ -1,0 +1,49 @@
+{
+    "framework": "WidgetKit",
+    "platform": "ios",
+    "total": 57,
+    "offset": 0,
+    "count": 8,
+    "types": [
+        {
+            "k": "struct",
+            "n": "AccessoryWidgetBackground",
+            "line": 38
+        },
+        {
+            "k": "struct",
+            "n": "ActivityConfiguration",
+            "line": 84
+        },
+        {
+            "k": "enum",
+            "n": "ActivityFamily",
+            "line": 179
+        },
+        {
+            "k": "enum",
+            "n": "ActivityPreviewViewKind",
+            "line": 281
+        },
+        {
+            "k": "struct",
+            "n": "ActivityViewContext",
+            "line": 369
+        },
+        {
+            "k": "struct",
+            "n": "AppIntentConfiguration",
+            "line": 429
+        },
+        {
+            "k": "struct",
+            "n": "AppIntentControlConfiguration",
+            "line": 507
+        },
+        {
+            "k": "protocol",
+            "n": "AppIntentControlValueProvider",
+            "line": 579
+        }
+    ]
+}
