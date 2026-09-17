@@ -22,6 +22,10 @@ export interface ConvertedHit {
   framework: string;
   lang: 'swift' | 'objc';
   platform: SdkPlatform;
+  /** Mọi platform chứa API này (chỉ set khi >1 — dedup cross-SDK). */
+  platforms?: SdkPlatform[];
+  /** Độ khớp so với query search ngang (chỉ search_apis set). */
+  match?: 'exact' | 'prefix' | 'contains' | 'fuzzy';
   signature: string;
   availability?: string;
   introducedIn?: number;
@@ -161,6 +165,27 @@ const FW_BOOST: Record<string, number> = {
   widgetkit: 4, watchkit: 4, appkit: 4, realitykit: 3, arkit: 3,
   appintents: 3, swiftdata: 2, charts: 2, mapkit: 2,
 };
+
+/** Thứ tự platform khi Agent không lọc: ios là nền tảng chính, lên trước. */
+const PLAT_RANK: Record<string, number> = {
+  ios: 0, xros: 1, macos: 2, watchos: 3, tvos: 4,
+};
+
+export function preferIos<T extends { platform?: string }>(hits: T[]): T[] {
+  return [...hits].sort(
+    (a, b) => (PLAT_RANK[a.platform ?? ''] ?? 9) - (PLAT_RANK[b.platform ?? ''] ?? 9),
+  );
+}
+
+/** Nhãn độ khớp của hit so với query search ngang. */
+export function matchLabel(name: string, query: string): 'exact' | 'prefix' | 'contains' | 'fuzzy' {
+  const n = name.toLowerCase();
+  const q = query.toLowerCase().trim();
+  if (n === q) return 'exact';
+  if (n.startsWith(q)) return 'prefix';
+  if (n.includes(q)) return 'contains';
+  return 'fuzzy';
+}
 
 export function rankHits<T extends { name: string; kind: string; framework?: string }>(hits: T[], query: string): T[] {
   const q = query.toLowerCase();

@@ -1,4 +1,4 @@
-# ios-sdk-mcp v0.5 — direct SDK mode + doc thật của Apple
+# ios-sdk-mcp v0.6 — direct SDK mode + doc thật của Apple
 
 MCP server đọc **trực tiếp file SDK trong Xcode.app** bằng ripgrep + hàm convert
 output (không index, không database, không build-index).
@@ -57,16 +57,17 @@ src/index.ts — 10 MCP tools (JSON gọn cho AI)
 | `src/convert.ts` | `convertLine` (dòng -> object), `objcLineMap`, `rankHits` (exact > prefix > contains, NOCASE, `_` phạt) |
 | `src/parser.ts` | Parser cũ, giờ là **thư viện hàm**: version/availability (`parseSwiftAvailable`, `mergeAvailability`, `inheritAvail`), decl match, ObjC macros, doc. Export thêm helpers cho convert. |
 | `src/types.ts` | `ApiSymbol`, `ConvertedHit`-tương thích, `SdkPlatform` |
-| `src/index.ts` | 10 tools MCP (stdio). Không import sql.js. |
+| `src/index.ts` | 12 tools MCP (stdio). Không import sql.js. |
 | `src/indexer.ts`, `src/build-index.ts` | **Legacy, không dùng ở runtime.** Giữ lại vì tests cũ (indexer/output/multiplatform/realdb) vẫn import. Sẽ xóa khi các tests đó migrate. |
 
-## Tools (11)
+## Tools (12)
 
 | Tool | Làm gì |
 |---|---|
-| `search_apis` | rg token dài nhất -> convert -> lọc tokens còn lại -> rank. Doc rút gọn còn **abstract** (1 đoạn đầu, ≤240 ký tự) để không ngập context. |
-| `get_api_detail` | Locate decl **decl-anchored** + sinh generated interface của framework -> **doc đầy đủ** + version + `readScopeMembers`. |
-| `get_type_members` | Members trong block + **mọi `extension <Type>`** trong file, mỗi member kèm abstract. |
+| `search_apis` | NGANG theo từ khóa: 2 tier EXACT (decl-anchored, budget riêng) + FUZZY, nhãn `match`, `mode: auto/exact/fuzzy`, ios-first, deterministic (`--sort path`). Doc **abstract** (≤240 ký tự). |
+| `get_api_detail` | DỌC 1 API:Locate decl **decl-anchored** + sinh generated interface -> **doc đầy đủ** + version + members **names-only**. |
+| `list_types` | **MỚI (v0.6)**: DỌC framework → types (không cần từ khóa). Ưu tiên cache CÓ doc, sort alpha, paging `limit/offset`, `detail: names/abstract`. |
+| `get_type_members` | DỌC type → members: block scope + **mọi `extension <Type>`** trong file. `detail: names/abstract`, `kind` filter, paging `limit/offset` + `total`. |
 | `prewarm_docs` | Sinh trước generated interface (theo danh sách framework, hoặc tất cả). |
 | `read_source` | Đọc source gốc có số dòng (chỉ trong Xcode.app). |
 | `grep_sdk` | rg thô file+dòng+text (khám phá rộng). |

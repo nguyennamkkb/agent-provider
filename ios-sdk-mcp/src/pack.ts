@@ -64,11 +64,19 @@ export function packList(
   };
 }
 
-/** Như packList nhưng cho members của 1 type (đã biết cha -> bỏ field kế thừa). */
+/** Mức chi tiết của 1 member trong output list: names (nhẹ nhất) ->
+ * abstract (1 dòng doc + version) -> full (mọi field). Mặc định callers
+ * truyền 'abstract'; 'names' cho câu "cha có con gì"; 'full' chỉ khi debug. */
+export type MemberDetail = 'names' | 'abstract' | 'full';
+
+/** Như packList nhưng cho members của 1 type (đã biết cha -> bỏ field kế thừa).
+ * List KHÔNG bao giờ trả full doc: ép abstract để 1 member doc dài 5KB
+ * không ngập context Agent (lỗi đã đo: docLens [26,80,170,515,44,187]). */
 export function packMembers(
   parent: ConvertedHit,
   members: ConvertedHit[],
   verbose: boolean,
+  detail: MemberDetail = 'abstract',
 ): Record<string, unknown>[] {
   if (verbose) return members as unknown as Record<string, unknown>[];
   return members.map((m) => {
@@ -81,6 +89,22 @@ export function packMembers(
     if (h.filePath === parent.filePath) delete h.filePath;
     if (h.introducedIn === parent.introducedIn) delete h.introducedIn;
     if (h.availability === parent.availability) delete h.availability;
+    delete h.platforms;
+    delete h.match;
+    if (detail === 'names') {
+      delete h.docComment;
+      delete h.signature;
+      delete h.availability;
+      delete h.introducedIn;
+      delete h.deprecatedIn;
+      delete h.renamedTo;
+      delete h.unavailable;
+    } else if (typeof h.docComment === 'string') {
+      // abstract: đoạn đầu tới dòng trống, ≤240 ký tự (đồng nhất search_apis).
+      const first = (h.docComment as string).split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim();
+      h.docComment = first.length > 240 ? `${first.slice(0, 239)}…` : first;
+      if (!h.docComment) delete h.docComment;
+    }
     h.line = h.lineNumber;
     delete h.lineNumber;
     return h;

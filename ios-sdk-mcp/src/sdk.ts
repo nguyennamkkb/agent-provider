@@ -120,7 +120,10 @@ function rgArgs(dirs: string[], extra: string[]): string[] {
   // --no-messages + --no-config: bỏ warning/time đọc config.
   // -P/--no-follow: KHÔNG theo symlink (macOS Modules -> Versions/Current
   // làm rg quét trùng file, trả path Versions/A/... lệch với discover).
-  args.push('--no-messages', '--no-config', '-P', ...extra, '--', ...dirs);
+  // --sort path: DETERMINISTIC — cùng query mọi lần cùng thứ tự matches.
+  // (rg -m là per-file nên không sort thì convert/dedup/rank ra top khác nhau
+  // giữa các lần gọi, Agent retry nhận kết quả khác.)
+  args.push('--no-messages', '--no-config', '-P', '--sort', 'path', ...extra, '--', ...dirs);
   return args;
 }
 
@@ -416,6 +419,16 @@ function collectOwnAvail(lines: string[], lineNumber: number): string[] {
     const t = (lines[i] ?? '').trim();
     if (!t) break;
     if (t.startsWith('#') || t.startsWith('@_originallyDefinedIn')) continue;
+    // NOTE: `t` đã trim() nên KHÔNG còn thụt đầu dòng để phân biệt member
+    // trong struct vs decl top-level — mọi check dưới dùng chuỗi đã trim.
+    // Dòng decl member (`public var content: Content`, kể cả `nonisolated
+    // public var axes...` của chính caller): own avail của axes nằm TRÊN nó
+    // (trên struct decl) -> xuyên qua, không dừng. (Raw .swiftinterface:
+    // member không own @available, avail duy nhất nằm trên struct decl.)
+    // Dòng mở scope (`... struct ScrollView<Content> ... {`) -> xuyên qua
+    // (collectOwnAvail của scope opener lo phần trên nó), KHÔNG break.
+    if (/\b(struct|class|enum|protocol|actor|extension)\b.*\{\s*$/.test(t)) continue;
+    if (/^(public|open|nonisolated|@frozen)\b.*\b(var|let|func|init|typealias)\b/.test(t) && !isAvailLine(t)) continue;
     if (isAvailLine(t)) {
       out.unshift(t);
       continue;

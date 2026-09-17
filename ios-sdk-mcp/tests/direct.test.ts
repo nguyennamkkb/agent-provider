@@ -102,7 +102,8 @@ describeRg('direct: ScrollView end-to-end (rg -> convert -> context)', () => {
 describeRg('direct: version ground truth (foregroundColor, Text+)', () => {
   it('foregroundColor: intro iOS 13 (không phải visionOS 1.0), renamed, sentinel bỏ', async () => {
     const fw = iosFiles.filter((f) => f.framework === 'SwiftUICore' && f.lang === 'swift');
-    const hits = await rgMatches('public func foregroundColor(_ color: SwiftUICore.Color?)', fw);
+    // Xcode 27: qualified `SwiftUICore::Color?` (không còn chấm `.`).
+    const hits = await rgMatches('public func foregroundColor(_ color: SwiftUICore::Color?)', fw);
     expect(hits.length).toBeGreaterThan(0);
     const ctx = analyzeContext(hits[0].file, hits[0].lineNumber);
     expect(ctx.introducedIn).toBe(130000);
@@ -111,7 +112,7 @@ describeRg('direct: version ground truth (foregroundColor, Text+)', () => {
   }, 15000);
   it('Text +: intro 13 + deprecated 26 (xuyên originallyDefinedIn)', async () => {
     const fw = iosFiles.filter((f) => f.framework === 'SwiftUICore' && f.lang === 'swift');
-    const hits = await rgMatches('public static func + (lhs: SwiftUICore.Text', fw);
+    const hits = await rgMatches('public static func + (lhs: SwiftUICore::Text', fw);
     expect(hits.length).toBeGreaterThan(0);
     const ctx = analyzeContext(hits[0].file, hits[0].lineNumber);
     expect(ctx.introducedIn).toBe(130000);
@@ -140,13 +141,18 @@ describeRg('direct: ObjC (ARSession, UIScrollView doc)', () => {
   }, 15000);
   it('member kế thừa scope: axes/showsIndicators intro iOS 13 (không own @available)', async () => {
     const fw = iosFiles.filter((f) => f.framework === 'SwiftUI' && f.lang === 'swift' && (f as SdkFile).platform === 'ios');
-    const hits = await rgMatches('public struct ScrollView<Content>', fw);
+    // Xcode 27: decl có prefix `nonisolated ` + qualified `SwiftUICore.View`.
+    const hits = await rgMatches('struct ScrollView<Content>', fw);
+    expect(hits.length).toBeGreaterThan(0);
     // axes nằm trong struct ScrollView (iOS 13 scope), không có @available riêng.
+    // Xcode 27: `nonisolated public var axes: SwiftUICore.Axis.Set` (có prefix).
     const { fileLines, findScopeOpener } = await import('../src/sdk.js');
     const lines = fileLines(hits[0].file);
     // tìm dòng axes trong struct này
     const { rgMatches: rg2 } = await import('../src/sdk.js');
-    const ax = await rg2('public var axes: SwiftUICore.Axis.Set', fw, 5);
+    // limit lớn: `axes` xuất hiện hàng chục lần trước ScrollView (dòng 1600...),
+    // axes của ScrollView ở ~18997 — `-m 5` không bao giờ tới.
+    const ax = await rg2('var axes: SwiftUICore.Axis.Set', fw, 400);
     const inScroll = ax.find((h) => h.file === hits[0].file && h.lineNumber > hits[0].lineNumber && h.lineNumber < hits[0].lineNumber + 25);
     expect(inScroll).toBeDefined();
     const ctx = analyzeContext(inScroll!.file, inScroll!.lineNumber);

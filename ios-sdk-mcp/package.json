@@ -1,6 +1,6 @@
 {
   "name": "ios-sdk-mcp",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "MCP server reading Apple SDK sources directly (no index): search, detail, members, source, grep",
   "type": "module",
   "main": "dist/index.js",

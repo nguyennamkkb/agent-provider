@@ -1,4 +1,4 @@
-# ios-sdk-mcp v0.5 — direct SDK mode + doc thật của Apple
+# ios-sdk-mcp v0.6 — direct SDK mode + output cho AI Agent
 
 MCP server đọc **trực tiếp file SDK trong Xcode.app** (không index, không database).
 AI agent hiểu **API là gì, version nào, dùng thế nào** — kèm **tài liệu gốc của
@@ -56,10 +56,32 @@ trường `IOS_SDK_MCP_CACHE`. Nâng cấp Xcode thì key cache tự đổi, kh�
 Lần đầu hỏi 1 framework mất ~0,4–3s để sinh doc; sau đó đọc file, ~0,1s.
 Muốn sinh sẵn: gọi tool `prewarm_docs`.
 
-## Available Tools (11)
+## Workflow cho AI Agent (dọc trước, ngang sau)
 
-| Tool | AI trả lời được |
+```
+list_frameworks(query) → list_types(framework) → get_type_members(type) → get_api_detail(name) → get_guide(topic)
+              ↘ search_apis(keyword) → get_api_detail(match:"exact")  [chỉ khi CHƯA biết type]
+```
+
+- **Dọc** (đã biết cha): rẻ, deterministic — `list_types` (~200 tok) →
+  `members names-only` (~20 tok/member) → `detail` full doc 1 API.
+- **Ngang** (chỉ có từ khóa): `search_apis` — exact block (`match:"exact"`)
+  lên trước, fuzzy (`prefix|contains|fuzzy`) sau. `mode:"exact"` khi đã biết
+  tên; `mode:"fuzzy"` khi khám phá.
+- **Nhẹ phân tầng**: `detail:"names"` (default, kind+name+line) →
+  `"abstract"` (chọn member) → `get_api_detail` (full doc).
+- Mặc định **platform ios** (line-number đúng file iPhone); `platform:"all"`
+  khi hỏi đa nền tảng. `get_api_detail` không tìm thấy → gợi ý NEXT step.
+- `get_deprecated` giữ `renamedTo` (+message trong marker) để migrate;
+  `get_new_apis` lọc đúng `introducedIn` version hỏi; `grep_sdk` là leaf/debug.
+- Mọi tool: JSON compact (không pretty), annotations MCP
+  (`readOnlyHint`, trừ `prewarm_docs`).
+
+## Available Tools (12)
+
+| Tool | AI trả lời được + WHEN/NEXT |
 |------|-------------|
+| `list_types` | **MỚI (v0.6)**: types trong framework — `names` gọn, paging `limit/offset`, sort alpha |
 | `search_apis` | Tìm API — rank exact > prefix > contains; kèm abstract ngắn; lọc `framework`/`kind`/`platform` |
 | `get_api_detail` | Signature + version + deprecation + **doc đầy đủ** + members |
 | `get_type_members` | Mọi member của type, gồm cả khai báo trong `extension`, mỗi member kèm abstract |
@@ -79,7 +101,7 @@ ios-sdk-mcp/
 ├── scripts/
 │   └── gen-iface.py    # sourcekitd (ctypes) -> generated interface, ghi atomic
 ├── src/
-│   ├── index.ts        # MCP server (stdio), 11 tools
+│   ├── index.ts        # MCP server (stdio), 12 tools
 │   ├── iface.ts        # Nguồn doc: sinh + cache + đổi nguồn Swift
 │   ├── sdk.ts          # discoverFiles, ripgrep, analyzeContext (version + doc)
 │   ├── convert.ts      # 1 dòng match -> API object, ranking

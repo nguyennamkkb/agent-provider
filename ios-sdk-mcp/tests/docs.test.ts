@@ -29,7 +29,8 @@ describe.skipIf(!hasXcode)('generated interface = nguồn doc của Swift', () =
 
   it('có decl kèm doc comment (thứ .swiftinterface KHÔNG có)', () => {
     const lines = fileLines(ifacePath!);
-    const idx = lines.findIndex((l) => /^public struct ScrollView<Content>/.test(l));
+    // Generated interface Xcode 27: prefix `nonisolated ` trước struct.
+    const idx = lines.findIndex((l) => /^(nonisolated )?public struct ScrollView<Content>/.test(l));
     expect(idx).toBeGreaterThan(0);
     const ctx = analyzeContext(ifacePath!, idx + 1);
     // Abstract phải nằm ở ĐẦU doc (lookback đủ dài, không bị cắt mất).
@@ -40,13 +41,14 @@ describe.skipIf(!hasXcode)('generated interface = nguồn doc của Swift', () =
 
   it('member cũng có doc riêng', () => {
     const lines = fileLines(ifacePath!);
-    const declIdx = lines.findIndex((l) => /^public struct ScrollView<Content>/.test(l));
+    const declIdx = lines.findIndex((l) => /^(nonisolated )?public struct ScrollView<Content>/.test(l));
     const memberIdx = lines.findIndex(
-      (l, i) => i > declIdx && /^\s+public var axes: Axis\.Set/.test(l),
+      (l, i) => i > declIdx && /\bvar axes: Axis\.Set/.test(l),
     );
     expect(memberIdx).toBeGreaterThan(declIdx);
     const ctx = analyzeContext(ifacePath!, memberIdx + 1);
-    expect(ctx.docComment).toContain('scrollable axes');
+    // Văn bản Apple đổi theo SDK: Xcode 27 là "The scrollable axes..." (trước đây "scrollable axes").
+    expect(ctx.docComment).toMatch(/axes.*scrollable|scrollable.*axes/i);
   });
 
   it('.swiftinterface gốc KHÔNG có doc (lý do tồn tại của iface.ts)', () => {
@@ -55,7 +57,8 @@ describe.skipIf(!hasXcode)('generated interface = nguồn doc của Swift', () =
     );
     expect(raw).toBeTruthy();
     const lines = fileLines(raw!.path);
-    const idx = lines.findIndex((l) => /public struct ScrollView</.test(l));
+    // Generated interface Xcode 27: prefix `nonisolated ` trước struct.
+    const idx = lines.findIndex((l) => /(nonisolated )?public struct ScrollView</.test(l));
     expect(idx).toBeGreaterThan(0);
     expect(analyzeContext(raw!.path, idx + 1).docComment).toBeUndefined();
   });
