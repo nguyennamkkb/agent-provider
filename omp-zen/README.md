@@ -12,15 +12,16 @@ py install.py op-zen-hoang --key "sk-..." --default    # Windows (best-effort)
 Kiểm tra:
 
 ```bash
-omp models op-zen-hoang                      # phải hiện đủ 7 models
+omp models op-zen-hoang                      # phải hiện đủ 9 models
 omp -p "Say OK"                               # phải trả về OK
 ```
 
 ## Nó làm gì
 
-Ghi 1 provider vào `~/.omp/agent/models.yml`: baseUrl Zen, apiKey, 7 models
-free đã verify (`muse-spark-1.3/1.2`, `big-pickle`, `ling-3.0-flash-fin`,
-`mimo-v2.5`, `nemotron-3-ultra`, `nemotron-3.5-lightning`), và headers
+Ghi 1 provider vào `~/.omp/agent/models.yml`: baseUrl Zen, apiKey, 9 models
+free (specs từ models.dev: `muse-spark-1.3/1.2`, `big-pickle`,
+`ling-3.1-flash`, `longcat-2.5-preview`, `mimo-v2.6-flash`,
+`nemotron-3.5-lightning`, `space-bunny`, `step-5-preview`), và headers
 `x-opencode-*` (Zen bắt buộc có `x-opencode-session`, thiếu là lỗi
 `MissingSessionID`). `--default` đặt model mặc định trong `config.yml`.
 

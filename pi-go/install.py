@@ -354,41 +354,48 @@ GO_PRESETS = [
 ]
 
 
-# Bảng thông số đã verify — nguồn duy nhất (trước đây trùng ở zen-add.sh).
-# muse-1.3: context/output đo bằng curl; ảnh test nhận; thinking thấy trace thật.
-# Còn lại: output/context theo cấu hình tay đã chốt, thinking theo trace
-# quan sát được (reasoning_content / reasoning_tokens / reasoning_details).
+# Bảng thông số — nguồn: pi-zen/models.dev.json (xem _live_ids), mirror pi-zen.
+# Context ~1M trần 400k client-side; maxTokens hạ theo khi vượt trần mới.
+# jev-1.13-free: loại khỏi bảng (ModelProtocolUnsupported cả 3 API).
 PRESETS = [
     {"id": "muse-spark-1.3-contributor-free", "api": "openai-responses",
      "name": "Muse Spark 1.3 Free",
-     "input": ["text", "image"], "contextWindow": 1048576, "maxTokens": 1000000,
+     "input": ["text", "image"], "contextWindow": 400000, "maxTokens": 400000,
      "reasoning": True, "cost": COST_ZERO,
      "thinkingLevelMap": THINK_MAP_SPARK, "compat": COMPAT_RESPONSES},
     {"id": "muse-spark-1.2-contributor-free", "api": "openai-responses",
      "name": "Muse Spark 1.2 Free",
-     "input": ["text", "image"], "contextWindow": 1048576, "maxTokens": 1000000,
+     "input": ["text", "image"], "contextWindow": 400000, "maxTokens": 400000,
      "reasoning": True, "cost": COST_ZERO,
      "thinkingLevelMap": THINK_MAP_SPARK, "compat": COMPAT_RESPONSES},
     {"id": "big-pickle", "api": "openai-completions",
      "name": "Big Pickle",
-     "input": ["text"], "contextWindow": 128000, "maxTokens": 8192,
+     "input": ["text"], "contextWindow": 200000, "maxTokens": 32000,
      "reasoning": True, "cost": COST_ZERO, "compat": COMPAT_COMPLETIONS},
-    {"id": "ling-3.0-flash-fin-free", "api": "openai-completions",
-     "name": "Ling 3.0 Flash Fin Free",
-     "input": ["text"], "contextWindow": 256000, "maxTokens": 32000,
+    {"id": "ling-3.1-flash-free", "api": "openai-completions",
+     "name": "Ling 3.1 Flash Free",
+     "input": ["text"], "contextWindow": 262144, "maxTokens": 32768,
      "reasoning": True, "cost": COST_ZERO, "compat": COMPAT_COMPLETIONS},
-    {"id": "mimo-v2.5-free", "api": "openai-completions",
-     "name": "MiMo V2.5 Free",
-     "input": ["text", "image"], "contextWindow": 1048576, "maxTokens": 128000,
+    {"id": "longcat-2.5-preview-free", "api": "openai-completions",
+     "name": "LongCat 2.5 Preview Free",
+     "input": ["text", "image"], "contextWindow": 400000, "maxTokens": 131072,
      "reasoning": True, "cost": COST_ZERO, "compat": COMPAT_COMPLETIONS},
-    {"id": "nemotron-3-ultra-free", "api": "openai-completions",
-     "name": "Nemotron 3 Ultra Free",
-     "input": ["text"], "contextWindow": 1048576, "maxTokens": 128000,
-     "reasoning": False, "cost": COST_ZERO, "compat": COMPAT_COMPLETIONS},
+    {"id": "mimo-v2.6-flash-free", "api": "openai-completions",
+     "name": "MiMo V2.6 Flash Free",
+     "input": ["text", "image"], "contextWindow": 200000, "maxTokens": 32000,
+     "reasoning": True, "cost": COST_ZERO, "compat": COMPAT_COMPLETIONS},
     {"id": "nemotron-3.5-lightning-free", "api": "openai-completions",
      "name": "Nemotron 3.5 Lightning Free",
-     "input": ["text"], "contextWindow": 1048576, "maxTokens": 500000,
-     "reasoning": False, "cost": COST_ZERO, "compat": COMPAT_COMPLETIONS},
+     "input": ["text"], "contextWindow": 262144, "maxTokens": 262144,
+     "reasoning": True, "cost": COST_ZERO, "compat": COMPAT_COMPLETIONS},
+    {"id": "space-bunny-free", "api": "openai-completions",
+     "name": "Space Bunny Free",
+     "input": ["text", "image"], "contextWindow": 400000, "maxTokens": 400000,
+     "reasoning": True, "cost": COST_ZERO, "compat": COMPAT_COMPLETIONS},
+    {"id": "step-5-preview-free", "api": "openai-completions",
+     "name": "Step 5 Preview Free",
+     "input": ["text", "image"], "contextWindow": 400000, "maxTokens": 65536,
+     "reasoning": True, "cost": COST_ZERO, "compat": COMPAT_COMPLETIONS},
 ]
 BY_ID = {m["id"]: m for m in PRESETS}
 GO_BY_ID = {m["id"]: m for m in GO_PRESETS}

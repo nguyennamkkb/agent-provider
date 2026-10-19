@@ -36,7 +36,7 @@ python3 install.py add <provider-id> <api-key> --default
 
 | Lệnh | Tác dụng |
 |---|---|
-| `add` | Ghi provider + 7 models free đã verify vào `models.json`/`auth.json`. `--default` đặt làm provider mặc định. |
+| `add` | Ghi provider + 9 models free (specs từ `models.dev.json`) vào `models.json`/`auth.json`. `--default` đặt làm provider mặc định. |
 | `sync` | Quét `/models` trên Zen, lọc model free, probe `Say OK` từng model, đo trần output, merge vào `models.json`. `--dry-run` chỉ in, không ghi. |
 | `doctor` | Kiểm tra pi, extension, lệnh `zen`, provider Zen trong `models.json`. |
 
@@ -47,16 +47,20 @@ zen add zen-phu sk-abc...xxx --default
 zen sync --provider zen-phu --dry-run
 ```
 
-## Models free (bảng verify sẵn trong `install.py`)
+## Models free (bảng specs trong `install.py`, nguồn `models.dev.json`)
 
 | Model | API | Context | Max output | Reasoning | Input |
 |---|---|---|---|---|---|
-| `muse-spark-1.3/1.2-contributor-free` | responses | 1M | 1M | ✅ | text+image |
-| `big-pickle` | completions | 128k | 8k | ✅ | text |
-| `ling-3.0-flash-fin-free` | completions | 256k | 32k | ✅ | text |
-| `mimo-v2.5-free` | completions | 1M | 128k | ✅ | text+image |
-| `nemotron-3-ultra-free` | completions | 1M | 128k | ❌ | text |
-| `nemotron-3.5-lightning-free` | completions | 1M | 500k | ❌ | text |
+| `muse-spark-1.3/1.2-contributor-free` | responses | 400k | 400k (trần client; đo tay 1M) | ✅ | text+image |
+| `big-pickle` | completions | 200k | 32k | ✅ | text |
+| `ling-3.1-flash-free` | completions | 262k | 32k | ✅ | text |
+| `longcat-2.5-preview-free` | completions | 400k | 128k | ✅ | text+image |
+| `mimo-v2.6-flash-free` | completions | 200k | 32k | ✅ | text+image |
+| `nemotron-3.5-lightning-free` | completions | 262k | 262k | ✅ | text |
+| `space-bunny-free` | completions | 400k | 400k (trần client; models.dev 512k) | ✅ | text+image |
+| `step-5-preview-free` | completions | 400k | 64k | ✅ | text+image |
+
+`jev-1.13-free` có trên endpoint live nhưng Pi/omp đều báo `ModelProtocolUnsupported` (cả 3 API) nên loại khỏi bảng.
 
 Model lạ ngoài bảng: `sync` tự probe, context default 128k.
 
@@ -65,6 +69,8 @@ Model lạ ngoài bảng: `sync` tự probe, context default 128k.
 ```
 pi-zen/
   install.py                # lệnh chung duy nhất (Python 3, không cần dep ngoài stdlib)
+  models.dev.json           # 38 models free trích từ https://models.dev/ (chạy refresh-models-dev.py để tải mới)
+  refresh-models-dev.py     # tải mới models.dev.json (provider opencode, chỉ giữ cost-0)
   zen-session-headers.ts    # Pi extension: gắn header + giữ session id ổn định
   README.md                 # file này
 ```

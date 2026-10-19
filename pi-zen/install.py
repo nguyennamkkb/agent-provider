@@ -36,41 +36,52 @@ COMPAT_RESPONSES = {"sessionAffinityFormat": "openai-nosession"}
 COMPAT_COMPLETIONS = {"supportsStore": False, "supportsDeveloperRole": False,
                       "maxTokensField": "max_tokens"}
 
-# Bảng thông số đã verify — nguồn duy nhất (trước đây trùng ở zen-add.sh).
-# muse-1.3: context/output đo bằng curl; ảnh test nhận; thinking thấy trace thật.
-# Còn lại: output/context theo cấu hình tay đã chốt, thinking theo trace
-# quan sát được (reasoning_content / reasoning_tokens / reasoning_details).
+# Bảng thông số — nguồn: pi-zen/models.dev.json (trích models free của
+# provider `opencode` trên https://models.dev/, chạy refresh-models-dev.py
+# để tải mới), đối chiếu endpoint live /models (xem _live_ids trong đó).
+# Context các model ~1M giới hạn trần 400k (client-side; server vẫn chịu tới
+# 1M — muse-1.3/1.2 đo bằng curl). maxTokens hạ theo khi vượt trần mới.
+# jev-1.13-free: live có nhưng models.dev chưa có, qua Pi/omp đều báo
+# ModelProtocolUnsupported cả 3 API -> loại khỏi bảng (chờ Zen mở lại).
 PRESETS = [
     {"id": "muse-spark-1.3-contributor-free", "api": "openai-responses",
      "name": "Muse Spark 1.3 Free",
-     "input": ["text", "image"], "contextWindow": 1048576, "maxTokens": 1000000,
+     "input": ["text", "image"], "contextWindow": 400000, "maxTokens": 400000,
      "reasoning": True, "cost": COST_ZERO,
      "thinkingLevelMap": THINK_MAP_SPARK, "compat": COMPAT_RESPONSES},
     {"id": "muse-spark-1.2-contributor-free", "api": "openai-responses",
      "name": "Muse Spark 1.2 Free",
-     "input": ["text", "image"], "contextWindow": 1048576, "maxTokens": 1000000,
+     "input": ["text", "image"], "contextWindow": 400000, "maxTokens": 400000,
      "reasoning": True, "cost": COST_ZERO,
      "thinkingLevelMap": THINK_MAP_SPARK, "compat": COMPAT_RESPONSES},
     {"id": "big-pickle", "api": "openai-completions",
      "name": "Big Pickle",
-     "input": ["text"], "contextWindow": 128000, "maxTokens": 8192,
+     "input": ["text"], "contextWindow": 200000, "maxTokens": 32000,
      "reasoning": True, "cost": COST_ZERO, "compat": COMPAT_COMPLETIONS},
-    {"id": "ling-3.0-flash-fin-free", "api": "openai-completions",
-     "name": "Ling 3.0 Flash Fin Free",
-     "input": ["text"], "contextWindow": 256000, "maxTokens": 32000,
+    {"id": "ling-3.1-flash-free", "api": "openai-completions",
+     "name": "Ling 3.1 Flash Free",
+     "input": ["text"], "contextWindow": 262144, "maxTokens": 32768,
      "reasoning": True, "cost": COST_ZERO, "compat": COMPAT_COMPLETIONS},
-    {"id": "mimo-v2.5-free", "api": "openai-completions",
-     "name": "MiMo V2.5 Free",
-     "input": ["text", "image"], "contextWindow": 1048576, "maxTokens": 128000,
+    {"id": "longcat-2.5-preview-free", "api": "openai-completions",
+     "name": "LongCat 2.5 Preview Free",
+     "input": ["text", "image"], "contextWindow": 400000, "maxTokens": 131072,
      "reasoning": True, "cost": COST_ZERO, "compat": COMPAT_COMPLETIONS},
-    {"id": "nemotron-3-ultra-free", "api": "openai-completions",
-     "name": "Nemotron 3 Ultra Free",
-     "input": ["text"], "contextWindow": 1048576, "maxTokens": 128000,
-     "reasoning": False, "cost": COST_ZERO, "compat": COMPAT_COMPLETIONS},
+    {"id": "mimo-v2.6-flash-free", "api": "openai-completions",
+     "name": "MiMo V2.6 Flash Free",
+     "input": ["text", "image"], "contextWindow": 200000, "maxTokens": 32000,
+     "reasoning": True, "cost": COST_ZERO, "compat": COMPAT_COMPLETIONS},
     {"id": "nemotron-3.5-lightning-free", "api": "openai-completions",
      "name": "Nemotron 3.5 Lightning Free",
-     "input": ["text"], "contextWindow": 1048576, "maxTokens": 500000,
-     "reasoning": False, "cost": COST_ZERO, "compat": COMPAT_COMPLETIONS},
+     "input": ["text"], "contextWindow": 262144, "maxTokens": 262144,
+     "reasoning": True, "cost": COST_ZERO, "compat": COMPAT_COMPLETIONS},
+    {"id": "space-bunny-free", "api": "openai-completions",
+     "name": "Space Bunny Free",
+     "input": ["text", "image"], "contextWindow": 400000, "maxTokens": 400000,
+     "reasoning": True, "cost": COST_ZERO, "compat": COMPAT_COMPLETIONS},
+    {"id": "step-5-preview-free", "api": "openai-completions",
+     "name": "Step 5 Preview Free",
+     "input": ["text", "image"], "contextWindow": 400000, "maxTokens": 65536,
+     "reasoning": True, "cost": COST_ZERO, "compat": COMPAT_COMPLETIONS},
 ]
 BY_ID = {m["id"]: m for m in PRESETS}
 
@@ -146,6 +157,23 @@ def cmd_add(provider: str, key: str, make_default: bool, home: Path) -> None:
     save_json(models_path, models_cfg)
     save_json(auth_path, auth)
     print(f"Đã ghi provider '{provider}' + {len(PRESETS)} models")
+
+    # Pi lọc /model và --list-models theo settings.enabledModels (nếu có).
+    # Không có entry nào khớp provider mới => /model không hiện provider đó.
+    # Tự thêm "<provider>/*" để models hiện ngay, giữ nguyên list cũ.
+    settings = load_json(settings_path)
+    enabled = settings.get("enabledModels")
+    if isinstance(enabled, list):
+        want = f"{provider}/*"
+        if want not in enabled:
+            shutil.copy(settings_path, str(settings_path) + ".bak")
+            settings["enabledModels"] = enabled + [want]
+            save_json(settings_path, settings)
+            print(f"Đã thêm '{want}' vào enabledModels "
+                  f"({len(enabled)} -> {len(enabled) + 1} patterns)")
+    else:
+        print("INFO: settings chưa có enabledModels (hiện toàn bộ catalogue) "
+              "— không cần thêm gì")
 
     if make_default:
         shutil.copy(settings_path, str(settings_path) + ".bak")
@@ -453,7 +481,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="zen", description="Lệnh chung cho OpenCode Zen + Pi")
     sub = p.add_subparsers(dest="cmd")
 
-    a = sub.add_parser("add", help="Thêm provider Zen (7 models free verify sẵn)")
+    a = sub.add_parser("add", help="Thêm provider Zen (9 models free, specs từ models.dev.json)")
     a.add_argument("provider_id")
     a.add_argument("api_key")
     a.add_argument("--default", action="store_true")

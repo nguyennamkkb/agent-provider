@@ -4,7 +4,7 @@
 
 | Module | Agent | Nguồn model | Cài đặt |
 |---|---|---|---|
-| [`pi-zen/`](pi-zen/) | [Pi](https://github.com/badlogic/pi-mono) | Zen free (`opencode.ai/zen/v1`, 7 models) | `./pi-zen/install.py install` rồi `zen add <id> <key> --default` |
+| [`pi-zen/`](pi-zen/) | [Pi](https://github.com/badlogic/pi-mono) | Zen free (`opencode.ai/zen/v1`, 9 models) | `./pi-zen/install.py install` rồi `zen add <id> <key> --default` |
 | [`pi-go/`](pi-go/) | [Pi](https://github.com/badlogic/pi-mono) | Go subscription $10/tháng (`opencode.ai/zen/go/v1`, 37 models) | `./pi-go/install.py install` rồi `pigo add <id> <key> --default` |
 | [`omp-zen/`](omp-zen/) | [omp](https://omp.sh) (fork của Pi) | Zen free | `./omp-zen/install.py <id> --key 'sk-...' --default` |
 | [`qwen-zen/`](qwen-zen/) | [qwen-code](https://github.com/QwenLM/qwen-code) | Zen free | `./qwen-zen/install.py --key "sk-..." --default` |

@@ -26,27 +26,37 @@ import json
 
 ZEN_BASE = "https://opencode.ai/zen/v1"
 DEFAULT_KEY_ENV = "OPENCODE_ZEN_API_KEY"
-DEFAULT_MODEL = "mimo-v2.5-free"  # default khoi dong: wire openai on dinh
+DEFAULT_MODEL = "mimo-v2.6-flash-free"  # default khoi dong: wire openai on dinh
 REPO_DIR = Path(__file__).resolve().parent
 
 # Bang thong so da verify — mirror voi pi-zen/omp-zen.
+# Context ~1M tran 400k client-side.
 # Nhom completions -> auth type "openai"; ho muse-spark -> "openai-responses".
 PRESETS_COMPLETIONS = [
-    {"id": "big-pickle", "contextWindow": 128000, "reasoning": True},
-    {"id": "ling-3.0-flash-fin-free", "contextWindow": 256000, "reasoning": True},
-    {"id": "mimo-v2.5-free", "input": ["text", "image"],
-     "contextWindow": 1048576, "reasoning": True},
-    {"id": "nemotron-3-ultra-free", "contextWindow": 1048576, "reasoning": False},
-    {"id": "nemotron-3.5-lightning-free", "contextWindow": 1048576, "reasoning": False},
+    {"id": "big-pickle", "contextWindow": 200000, "reasoning": True},
+    {"id": "ling-3.1-flash-free", "contextWindow": 262144, "reasoning": True},
+    {"id": "longcat-2.5-preview-free", "input": ["text", "image"],
+     "contextWindow": 400000, "reasoning": True},
+    {"id": "mimo-v2.6-flash-free", "input": ["text", "image"],
+     "contextWindow": 200000, "reasoning": True},
+    {"id": "nemotron-3.5-lightning-free", "contextWindow": 262144, "reasoning": True},
+    {"id": "space-bunny-free", "input": ["text", "image"],
+     "contextWindow": 400000, "reasoning": True},
+    {"id": "step-5-preview-free", "input": ["text", "image"],
+     "contextWindow": 400000, "reasoning": True},
 ]
 PRESETS_RESPONSES = [
     {"id": "muse-spark-1.3-contributor-free", "input": ["text", "image"],
-     "contextWindow": 1048576, "reasoning": True},
+     "contextWindow": 400000, "reasoning": True},
     {"id": "muse-spark-1.2-contributor-free", "input": ["text", "image"],
-     "contextWindow": 1048576, "reasoning": True},
+     "contextWindow": 400000, "reasoning": True},
 ]
 ALL_IDS = ([m["id"] for m in PRESETS_COMPLETIONS] +
            [m["id"] for m in PRESETS_RESPONSES])
+# Model cu da chet tren live (de --uninstall don sach config cu).
+LEGACY_IDS = ["ling-3.0-flash-fin-free", "mimo-v2.5-free",
+              "nemotron-3-ultra-free"]
+ALL_IDS = ALL_IDS + [m for m in LEGACY_IDS if m not in ALL_IDS]
 
 CUSTOM_HEADERS_COMPLETIONS = {
     # Wire openai co expand ${session_id} theo conversation that.

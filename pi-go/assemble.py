@@ -175,7 +175,7 @@ rep('Thiếu api-key: zen add-go <provider-id> <api-key> [--default]',
     'Thiếu api-key: pigo add-go <provider-id> <api-key> [--default]')
 
 # --- 10. Help text riêng cho pigo (parser add/sync/install gốc Zen) ---
-src = src.replace("Thêm provider Zen (7 models free verify sẵn)",
+src = src.replace("Thêm provider Zen (9 models free, specs từ models.dev.json)",
                   "Thêm provider Go (37 models models.dev, key + endpoint riêng)")
 src = src.replace("Cài lệnh zen vào PATH (+extension nếu --with-ext)",
                   "Cài lệnh pigo vào PATH (+extension nếu --with-ext)")

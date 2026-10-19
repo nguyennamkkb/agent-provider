@@ -28,29 +28,37 @@ DEFAULT_KEY_ENV = "OPENCODE_API_KEY"
 HELPER_NAME = "zen-session-id"
 REPO_DIR = Path(__file__).resolve().parent
 
-# Bang thong so da verify — mirror voi pi-zen (giu dong bo tay khi doi).
+# Bang thong so — mirror voi pi-zen (giu dong bo tay khi doi).
+# Context ~1M tran 400k client-side; maxTokens ha theo khi vuot tran moi.
+# jev-1.13-free: loai khoi bang (ModelProtocolUnsupported ca 3 API).
 PRESETS = [
     {"id": "muse-spark-1.3-contributor-free", "api": "openai-responses",
-     "input": ["text", "image"], "contextWindow": 1048576, "maxTokens": 1000000,
+     "input": ["text", "image"], "contextWindow": 400000, "maxTokens": 400000,
      "reasoning": True},
     {"id": "muse-spark-1.2-contributor-free", "api": "openai-responses",
-     "input": ["text", "image"], "contextWindow": 1048576, "maxTokens": 1000000,
+     "input": ["text", "image"], "contextWindow": 400000, "maxTokens": 400000,
      "reasoning": True},
     {"id": "big-pickle", "api": "openai-completions",
-     "input": ["text"], "contextWindow": 128000, "maxTokens": 8192,
+     "input": ["text"], "contextWindow": 200000, "maxTokens": 32000,
      "reasoning": True},
-    {"id": "ling-3.0-flash-fin-free", "api": "openai-completions",
-     "input": ["text"], "contextWindow": 256000, "maxTokens": 32000,
+    {"id": "ling-3.1-flash-free", "api": "openai-completions",
+     "input": ["text"], "contextWindow": 262144, "maxTokens": 32768,
      "reasoning": True},
-    {"id": "mimo-v2.5-free", "api": "openai-completions",
-     "input": ["text", "image"], "contextWindow": 1048576, "maxTokens": 128000,
+    {"id": "longcat-2.5-preview-free", "api": "openai-completions",
+     "input": ["text", "image"], "contextWindow": 400000, "maxTokens": 131072,
      "reasoning": True},
-    {"id": "nemotron-3-ultra-free", "api": "openai-completions",
-     "input": ["text"], "contextWindow": 1048576, "maxTokens": 128000,
-     "reasoning": False},
+    {"id": "mimo-v2.6-flash-free", "api": "openai-completions",
+     "input": ["text", "image"], "contextWindow": 200000, "maxTokens": 32000,
+     "reasoning": True},
     {"id": "nemotron-3.5-lightning-free", "api": "openai-completions",
-     "input": ["text"], "contextWindow": 1048576, "maxTokens": 500000,
-     "reasoning": False},
+     "input": ["text"], "contextWindow": 262144, "maxTokens": 262144,
+     "reasoning": True},
+    {"id": "space-bunny-free", "api": "openai-completions",
+     "input": ["text", "image"], "contextWindow": 400000, "maxTokens": 400000,
+     "reasoning": True},
+    {"id": "step-5-preview-free", "api": "openai-completions",
+     "input": ["text", "image"], "contextWindow": 400000, "maxTokens": 65536,
+     "reasoning": True},
 ]
 
 
